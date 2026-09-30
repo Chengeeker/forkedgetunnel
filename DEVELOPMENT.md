@@ -20,6 +20,17 @@
 
 域名优选若要使用自己的页面，需要另外 fork / 部署 `CF-Pages-BestCF`，并修改 `EDT-Pages` 中的域名优选跳转地址；本仓库不会直接修改第三方域名站点。
 
+## 实际部署顺序
+
+主程序和管理面板是两个独立的 Pages 项目，但部署方式都可以使用 Cloudflare 的“连接到 Git / GitHub”流程：
+
+1. 在第一个 Pages 项目中选择 `Chengeeker/forkedgetunnel`，生产分支选择 `main`，其余构建设置沿用原项目的部署方式；继续配置 `ADMIN` 和 `KV`。
+2. 在第二个 Pages 项目中选择 `Chengeeker/EDT-Pages.github.io`，生产分支选择 `main`，构建命令留空，输出目录使用仓库根目录，然后部署静态面板。
+3. 复制第二个项目生成的 `https://xxx.pages.dev` 地址，在第一个项目的生产环境变量中新增 `EDT_PAGES_URL`。这里只填写面板根地址，不要加 `/admin`。
+4. 保存变量并重新部署第一个项目。之后访问第一个项目的 `/admin`，登录后进入在线优选 IP，速度列旁边才会出现“一键测速”。
+
+如果不配置 `EDT_PAGES_URL`，主程序仍会加载官方面板，所以主程序可以正常运行，但看不到本次面板改动。先部署主程序还是先部署面板都可以；通常先部署面板拿到 `pages.dev` 地址，再配置主程序更直观。
+
 ## 本次验证
 
 - `admin/index.html` 的脚本块可由 Node.js `new Function` 编译。
