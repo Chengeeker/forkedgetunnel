@@ -7764,6 +7764,37 @@
 			margin-top: 8px;
 		}
 
+		.home-broadband-help {
+			margin-top: 14px;
+		}
+
+		.home-broadband-help-list {
+			margin: 0;
+			padding-left: 22px;
+			color: var(--text-secondary);
+			font-size: 12px;
+			line-height: 1.65;
+		}
+
+		.home-broadband-help-list li + li {
+			margin-top: 8px;
+		}
+
+		.home-broadband-help-list strong {
+			color: var(--text-primary);
+		}
+
+		.home-broadband-help-warning {
+			margin-top: 12px;
+			padding: 10px 12px;
+			border: 1px solid #ffe2a6;
+			border-radius: 8px;
+			background: var(--amber-soft);
+			color: var(--amber);
+			font-size: 12px;
+			line-height: 1.6;
+		}
+
 		html.dark-mode .network-tip {
 			color: #999;
 		}
@@ -11184,7 +11215,27 @@
 							</div>
 						</div>
 					</div>
-					<div class="network-tip">· 开启后会在上方显示专用 Clash 家宽订阅，仅支持 mihomo / Clash Meta 1.19.25+。</div>
+					<details class="settings-block advanced-settings home-broadband-help" open>
+						<summary class="advanced-settings-summary">
+							<span class="advanced-settings-copy">
+								<span class="advanced-settings-title">免费家宽链式怎么用？</span>
+								<span class="advanced-settings-meta">CF 前置 → VPN Gate 志愿者出口 · 仅支持 mihomo / Clash Meta</span>
+							</span>
+							<svg class="advanced-settings-chevron" viewBox="0 0 24 24" aria-hidden="true">
+								<path d="m6 9 6 6 6-6" />
+							</svg>
+						</summary>
+						<div class="advanced-settings-body">
+							<ol class="home-broadband-help-list">
+								<li><strong>开启并保存：</strong>勾选上面的「开启免费家宽链式」，点击本模块底部的「保存」。保存后，页面顶部「获取节点链接」才会显示「Clash 家宽订阅」。</li>
+								<li><strong>导入专用链接：</strong>复制「Clash 家宽订阅」，在 mihomo / Clash Meta 1.19.25+ 中作为<strong>配置文件/订阅配置</strong>导入，不要把它当作普通 VLESS 节点链接使用。</li>
+								<li><strong>选择出口：</strong>首次使用建议在主策略组「🚀 节点选择」中选择「🏠 家宽自动」。如果需要手动选择，可以进入「🏠 家宽节点」；「⚡ CF前置」只负责连接前置，不是最终出口。</li>
+								<li><strong>等待节点：</strong>第一次请求会从 VPN Gate 拉取并筛选 TCP OpenVPN 节点，节点数量和可用性会随时间变化；普通订阅不会触发这次请求。</li>
+								<li><strong>遇到错误：</strong>403 通常表示开关还没有保存；503 表示节点源暂时不可用或当前没有筛选出 TCP 节点；如果客户端提示不认识 `openvpn` 或 `dialer-proxy`，请升级到 mihomo / Clash Meta 1.19.25+。</li>
+							</ol>
+							<div class="home-broadband-help-warning"><strong>重要限制：</strong>这里使用的是公开志愿者节点，不保证是真实家宽、稳定或安全；当前只承载 TCP，不支持 UDP。不要通过不信任的落地节点传输密码、支付信息或其他敏感内容。</div>
+						</div>
+					</details>
 
 					<div class="module-footer">
 						<div class="btn-group">
