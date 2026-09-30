@@ -1,3 +1,10 @@
+<!--
+forkedgetunnel development record.
+This document records modifications and additions made by Chengeeker on
+2026-09-30 to the upstream edgetunnel project. See ../LICENSE for the
+GNU General Public License, version 2.
+-->
+
 # 开发记录
 
 ## Fork 品牌与默认配置
@@ -6,6 +13,14 @@
 - 新建配置默认订阅名称为 `forkedgetunnel`，默认开启 ECH，默认 `PROXYIP` 为 `proxyip.cmliussss.net`。
 - `_worker.js` 对仍保留原项目三项默认值（订阅名 `edgetunnel`、ECH 关闭、PROXYIP 为 `auto`）且未完成 fork 默认迁移的旧 KV 配置执行一次迁移；检测到这些字段已有不同自定义值时不会覆盖。迁移后写入 `_forkedgetunnelDefaultsVersion`，用户后续手动修改会被保留。
 - `Pages静态页面` 仍是普通 Worker 无 `ASSETS` 绑定时的外部管理页回退地址；Pages 合并部署优先读取本仓库的本地 `admin/`、`login/` 等资源，不能把 GitHub 仓库 URL 直接当作 HTML 回退地址。
+
+## GPL-2.0 合规整理
+
+- `LICENSE` 保留上游完整的 GNU GPL-2.0 文本，未改写；README 现在明确说明本仓库是上游 `edgetunnel` 的修改版，并将当前 fork 的新增和修改内容继续置于 GPL-2.0 下。
+- `_worker.js`、`admin/`、`login/`、`noADMIN/`、`noKV/` 页面和 README/开发记录均带有上游来源、修改者、修改日期及许可证指针，满足对本次 fork 修改内容的显著说明要求。
+- README 的“教育/研究/个人安全测试”和部署删除内容已改成风险提示与安全建议，不作为限制 GPL-2.0 权利的附加条件；法律法规遵守和无担保说明继续保留。
+- `cdn-cgi/trace` 是登录页使用的静态探测数据，`patches/EDT-Pages-admin-speed.patch` 是可应用的补丁记录，不是程序源文件；没有向这些格式中插入会改变其数据或补丁可应用性的许可证注释。
+- 本次是仓库层面的静态合规整理，不构成法律意见；第三方 CDN 组件、外部服务和独立数据源仍需按其各自许可证或服务条款处理。
 
 ## 自定义优选一键排序
 

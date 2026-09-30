@@ -1,3 +1,11 @@
+<!--
+forkedgetunnel is a modified fork of the upstream edgetunnel project.
+Upstream source: https://github.com/cmliu/edgetunnel
+Fork modifications and additions by Chengeeker, 2026-09-30.
+The project's own source and fork modifications are distributed under the
+GNU General Public License, version 2. See LICENSE for the complete text.
+-->
+
 # 🚀 forkedgetunnel 2.1
 ![后台页面](./img.png)
 
@@ -221,13 +229,19 @@
 
 ---
 
-## ⚠️ 免责声明
+## 📄 许可证与修改说明
 
-1. 本项目（"forkedgetunnel"）仅供**教育、科学研究及个人安全测试**之目的。
+本仓库是上游 `edgetunnel` 项目的修改版，保留并继续使用 GNU GPL-2.0。当前 fork 的新增和修改内容也按 GPL-2.0 发布；第三方组件、数据和外部服务仍以其各自的许可证或服务条款为准。完整许可证文本见仓库中的 [LICENSE](./LICENSE) 文件。
+
+---
+
+## ⚠️ 免责声明与使用提示
+
+1. 作者建议将本项目用于**教育、科学研究及个人安全测试**；这是一项风险提示，不构成对 GPL-2.0 所授予权利的额外限制。
 2. 使用者在下载或使用本项目代码时，必须严格遵守所在地区的法律法规。
 3. 上游作者 **cmliu** 对任何滥用本项目代码导致的行为或后果均不承担任何责任。
 4. 本项目不对因使用代码引起的任何直接或间接损害负责。
-5. 建议在测试完成后 24 小时内删除本项目相关部署。
+5. 建议在测试完成后及时删除不再需要的相关部署，以减少安全风险；这只是安全建议，不构成许可证条件。
 
 ---
 

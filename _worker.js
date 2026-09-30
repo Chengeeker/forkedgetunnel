@@ -1,4 +1,12 @@
 ﻿const Version = '2026-09-22 20:01:17';
+/*
+ * forkedgetunnel - modified version of the upstream edgetunnel project.
+ * Upstream source: https://github.com/cmliu/edgetunnel
+ * Fork modifications and additions by Chengeeker, 2026-09-30.
+ *
+ * This file is distributed under the GNU General Public License, version 2.
+ * See the LICENSE file in the repository for the complete license text.
+ */
 let config_JSON, 缓存SOCKS5白名单 = null, 调试日志打印 = false;
 let SOCKS5白名单 = ['*tapecontent.net', '*cloudatacdn.com', '*loadshare.org', '*cdn-centaurus.com', 'scholar.google.com'];
 let 免费家宽节点缓存 = null, 免费家宽节点缓存到期时间 = 0;
