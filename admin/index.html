@@ -10560,6 +10560,60 @@
 				</div>
 			</div>
 
+			<!-- 模块1.5: 免费家宽链式 -->
+			<div class="module collapsed advanced-module mode-always-visible" id="homeBroadbandModule">
+				<div class="module-title" onclick="toggleModule(this)">
+					🏠 免费家宽链式
+					<svg class="collapse-icon" viewBox="0 0 24 24">
+						<path d="M7 10l5 5 5-5z" />
+					</svg>
+				</div>
+				<div class="module-content">
+					<div class="form-group" id="freeHomeGroup">
+						<label for="freeHome">家宽链式</label>
+						<div class="input-wrapper">
+							<div class="checkbox-group">
+								<input type="checkbox" id="freeHome" title="使用 CF 节点作为前置，通过 VPN Gate 志愿者 OpenVPN 节点作为落地"
+									onchange="updateHomeBroadbandLinkUI(); markModified('homeBroadband')">
+								<label for="freeHome" class="checkbox-label"
+									title="仅支持 mihomo / Clash Meta 1.19.25+，节点来自 VPN Gate 志愿者共享网络，稳定性和住宅属性不保证">开启免费家宽链式</label>
+							</div>
+						</div>
+					</div>
+					<div class="network-tip">· 开启并保存后，上方会显示专用的「Clash 家宽订阅」链接；普通订阅不会改变。</div>
+					<details class="settings-block advanced-settings home-broadband-help" open>
+						<summary class="advanced-settings-summary">
+							<span class="advanced-settings-copy">
+								<span class="advanced-settings-title">免费家宽链式怎么用？</span>
+								<span class="advanced-settings-meta">CF 前置 → VPN Gate 志愿者出口 · 仅支持 mihomo / Clash Meta</span>
+							</span>
+							<svg class="advanced-settings-chevron" viewBox="0 0 24 24" aria-hidden="true">
+								<path d="m6 9 6 6 6-6" />
+							</svg>
+						</summary>
+						<div class="advanced-settings-body">
+							<ol class="home-broadband-help-list">
+								<li><strong>开启并保存：</strong>勾选上面的「开启免费家宽链式」，点击本模块底部的「保存」。保存后，页面顶部「获取节点链接」才会显示「Clash 家宽订阅」。</li>
+								<li><strong>导入专用链接：</strong>复制「Clash 家宽订阅」，在 mihomo / Clash Meta 1.19.25+ 中作为<strong>配置文件/订阅配置</strong>导入，不要把它当作普通 VLESS 节点链接使用。</li>
+								<li><strong>选择出口：</strong>首次使用建议在主策略组「🚀 节点选择」中选择「🏠 家宽自动」。如果需要手动选择，可以进入「🏠 家宽节点」；「⚡ CF前置」只负责连接前置，不是最终出口。</li>
+								<li><strong>等待节点：</strong>第一次请求会从 VPN Gate 拉取并筛选 TCP OpenVPN 节点，节点数量和可用性会随时间变化；普通订阅不会触发这次请求。</li>
+								<li><strong>遇到错误：</strong>403 通常表示开关还没有保存；503 表示节点源暂时不可用或当前没有筛选出 TCP 节点；如果客户端提示不认识 `openvpn` 或 `dialer-proxy`，请升级到 mihomo / Clash Meta 1.19.25+。</li>
+							</ol>
+							<div class="home-broadband-help-warning"><strong>重要限制：</strong>这里使用的是公开志愿者节点，不保证是真实家宽、稳定或安全；当前只承载 TCP，不支持 UDP。不要通过不信任的落地节点传输密码、支付信息或其他敏感内容。</div>
+						</div>
+					</details>
+
+					<div class="module-footer">
+						<div class="btn-group">
+							<button type="button" class="btn btn-secondary" onclick="cancelEdit('homeBroadband')" disabled
+								id="cancelHomeBroadbandBtn">取消</button>
+							<button type="button" class="btn btn-primary" onclick="saveHomeBroadband()" disabled
+								id="saveHomeBroadbandBtn">保存</button>
+						</div>
+					</div>
+				</div>
+			</div>
+
 			<!-- 模块2: 编辑订阅生成 -->
 			<div class="module" id="preferredSubscriptionModule">
 				<div class="module-title non-collapsible">
@@ -11204,38 +11258,7 @@
 								</div>
 							</div>
 						</div>
-						<div class="form-group" id="freeHomeGroup">
-							<div class="input-wrapper">
-								<div class="checkbox-group">
-									<input type="checkbox" id="freeHome" title="使用 CF 节点作为前置，通过 VPN Gate 志愿者 OpenVPN 节点作为落地"
-										onchange="updateHomeBroadbandLinkUI(); markModified('convert')">
-									<label for="freeHome" class="checkbox-label"
-										title="仅支持 mihomo / Clash Meta 1.19.25+，节点来自 VPN Gate 志愿者共享网络，稳定性和住宅属性不保证">开启免费家宽链式</label>
-								</div>
-							</div>
-						</div>
 					</div>
-					<details class="settings-block advanced-settings home-broadband-help" open>
-						<summary class="advanced-settings-summary">
-							<span class="advanced-settings-copy">
-								<span class="advanced-settings-title">免费家宽链式怎么用？</span>
-								<span class="advanced-settings-meta">CF 前置 → VPN Gate 志愿者出口 · 仅支持 mihomo / Clash Meta</span>
-							</span>
-							<svg class="advanced-settings-chevron" viewBox="0 0 24 24" aria-hidden="true">
-								<path d="m6 9 6 6 6-6" />
-							</svg>
-						</summary>
-						<div class="advanced-settings-body">
-							<ol class="home-broadband-help-list">
-								<li><strong>开启并保存：</strong>勾选上面的「开启免费家宽链式」，点击本模块底部的「保存」。保存后，页面顶部「获取节点链接」才会显示「Clash 家宽订阅」。</li>
-								<li><strong>导入专用链接：</strong>复制「Clash 家宽订阅」，在 mihomo / Clash Meta 1.19.25+ 中作为<strong>配置文件/订阅配置</strong>导入，不要把它当作普通 VLESS 节点链接使用。</li>
-								<li><strong>选择出口：</strong>首次使用建议在主策略组「🚀 节点选择」中选择「🏠 家宽自动」。如果需要手动选择，可以进入「🏠 家宽节点」；「⚡ CF前置」只负责连接前置，不是最终出口。</li>
-								<li><strong>等待节点：</strong>第一次请求会从 VPN Gate 拉取并筛选 TCP OpenVPN 节点，节点数量和可用性会随时间变化；普通订阅不会触发这次请求。</li>
-								<li><strong>遇到错误：</strong>403 通常表示开关还没有保存；503 表示节点源暂时不可用或当前没有筛选出 TCP 节点；如果客户端提示不认识 `openvpn` 或 `dialer-proxy`，请升级到 mihomo / Clash Meta 1.19.25+。</li>
-							</ol>
-							<div class="home-broadband-help-warning"><strong>重要限制：</strong>这里使用的是公开志愿者节点，不保证是真实家宽、稳定或安全；当前只承载 TCP，不支持 UDP。不要通过不信任的落地节点传输密码、支付信息或其他敏感内容。</div>
-						</div>
-					</details>
 
 					<div class="module-footer">
 						<div class="btn-group">
@@ -19566,6 +19589,7 @@
 			document.getElementById('singboxLink').value = `https://${host}/sub?token=${token}&sb`;
 			const homeBroadbandLink = document.getElementById('homeBroadbandLink');
 			if (homeBroadbandLink) homeBroadbandLink.value = `https://${host}/sub?token=${token}&target=home`;
+			syncHomeBroadbandOption();
 
 			// 编辑订阅生成
 			const local = currentConfig.优选订阅生成?.local ?? true;
@@ -21134,6 +21158,11 @@
 			document.getElementById('saveConvertBtn').disabled = !convertModified;
 			document.getElementById('cancelConvertBtn').disabled = !convertModified;
 
+			// 免费家宽链式模块
+			const homeBroadbandModified = modifiedSections.has('homeBroadband');
+			document.getElementById('saveHomeBroadbandBtn').disabled = !homeBroadbandModified;
+			document.getElementById('cancelHomeBroadbandBtn').disabled = !homeBroadbandModified;
+
 			// 通知设置模块
 			const notificationModified = modifiedSections.has('notification');
 			document.getElementById('saveNotificationBtn').disabled = !notificationModified;
@@ -21160,6 +21189,13 @@
 			if (!linkGroup) return;
 			const isEnabled = enabled === null ? Boolean(checkbox?.checked) : Boolean(enabled);
 			linkGroup.style.display = isEnabled ? '' : 'none';
+		}
+
+		function syncHomeBroadbandOption() {
+			const freeHomeCheckbox = document.getElementById('freeHome');
+			const freeHomeEnabled = currentConfig.订阅转换配置?.免费家宽 === true;
+			if (freeHomeCheckbox) freeHomeCheckbox.checked = freeHomeEnabled;
+			updateHomeBroadbandLinkUI(freeHomeEnabled);
 		}
 
 		function handleTLSFragmentChange(type) {
@@ -21762,11 +21798,6 @@
 		}
 
 		function syncSubListOption() {
-			const freeHomeCheckbox = document.getElementById('freeHome');
-			const freeHomeEnabled = currentConfig.订阅转换配置?.免费家宽 === true;
-			if (freeHomeCheckbox) freeHomeCheckbox.checked = freeHomeEnabled;
-			updateHomeBroadbandLinkUI(freeHomeEnabled);
-
 			const subListGroup = document.getElementById('subListGroup');
 			const hasSubList = currentConfig.订阅转换配置?.SUBLIST !== undefined;
 
@@ -21830,6 +21861,14 @@
 			}
 		});
 
+		async function saveHomeBroadband() {
+			if (!currentConfig.订阅转换配置 || typeof currentConfig.订阅转换配置 !== 'object') {
+				currentConfig.订阅转换配置 = {};
+			}
+			currentConfig.订阅转换配置.免费家宽 = document.getElementById('freeHome')?.checked === true;
+			await saveConfigToServer('homeBroadband');
+		}
+
 		async function saveConvert() {
 			const hasSubList = currentConfig.订阅转换配置?.SUBLIST !== undefined;
 			const hasUDP = currentConfig.订阅转换配置?.UDP !== undefined;
@@ -21842,7 +21881,7 @@
 				SUBAPI: document.getElementById('subAPI').value,
 				SUBCONFIG: document.getElementById('subConfig').value,
 				SUBEMOJI: document.getElementById('emoji').checked,
-				免费家宽: document.getElementById('freeHome')?.checked === true
+				免费家宽: currentConfig.订阅转换配置?.免费家宽 === true
 			};
 			if (hasSubList) {
 				currentConfig.订阅转换配置.SUBLIST = document.getElementById('subList').checked;
@@ -21884,6 +21923,12 @@
 
 				if (!response.ok) throw new Error('保存失败');
 				showToast('✅ 配置已保存，请更新订阅，才能获取最新节点内容！', 'success');
+				if (section === 'homeBroadband') {
+					if (!originalConfig.订阅转换配置 || typeof originalConfig.订阅转换配置 !== 'object') {
+						originalConfig.订阅转换配置 = {};
+					}
+					originalConfig.订阅转换配置.免费家宽 = currentConfig.订阅转换配置.免费家宽;
+				}
 				modifiedSections.delete(section);
 				updateButtonStates();
 			} catch (error) {
@@ -21973,6 +22018,8 @@
 				}
 			} else if (section === 'proxy') {
 				applyProxyConfigToForm();
+			} else if (section === 'homeBroadband') {
+				syncHomeBroadbandOption();
 			} else if (section === 'convert') {
 				document.getElementById('subAPI').value = currentConfig.订阅转换配置?.SUBAPI || '';
 				document.getElementById('subConfig').value = currentConfig.订阅转换配置?.SUBCONFIG || '';
@@ -25554,6 +25601,8 @@
 					syncALPNSelectFromConfig();
 				} else if (section === 'proxy') {
 					applyProxyConfigToForm();
+				} else if (section === 'homeBroadband') {
+					syncHomeBroadbandOption();
 				} else if (section === 'convert') {
 					document.getElementById('subAPI').value = currentConfig.订阅转换配置?.SUBAPI || '';
 					document.getElementById('subConfig').value = currentConfig.订阅转换配置?.SUBCONFIG || '';
