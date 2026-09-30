@@ -5628,6 +5628,7 @@ async function 读取config_JSON(env, hostname, userID, UA = "Mozilla/5.0", 重�
 		HOST: host,
 		HOSTS: [hostname],
 		UUID: userID,
+		_forkedgetunnelDefaultsVersion: 1,
 		PATH: "/",
 		ALPN: "",
 		协议类型: "v" + "le" + "ss",
@@ -5638,7 +5639,7 @@ async function 读取config_JSON(env, hostname, userID, UA = "Mozilla/5.0", 重�
 		启用0RTT: false,
 		TLS分片: null,
 		随机路径: false,
-		ECH: false,
+		ECH: true,
 		ECHConfig: {
 			DNS: Ali_DoH,
 			SNI: ECH_SNI,
@@ -5656,7 +5657,7 @@ async function 读取config_JSON(env, hostname, userID, UA = "Mozilla/5.0", 重�
 				指定端口: -1,
 			},
 			SUB: null,
-			SUBNAME: "edge" + "tunnel",
+			SUBNAME: "forkedgetunnel",
 			SUBUpdateTime: 3, // 订阅更新时间（小时）
 			TOKEN: await MD5MD5(hostname + userID),
 		},
@@ -5673,7 +5674,7 @@ async function 读取config_JSON(env, hostname, userID, UA = "Mozilla/5.0", 重�
 			EXPAND: true, // 展开规则全文
 		},
 		反代: {
-			[_p]: "auto",
+			[_p]: "proxyip.cmliussss.net",
 			SOCKS5: {
 				启用: null,
 				全局: false,
@@ -5737,6 +5738,28 @@ async function 读取config_JSON(env, hostname, userID, UA = "Mozilla/5.0", 重�
 		console.error(`读取config_JSON出错: ${error.message}`);
 		config_JSON = 默认配置JSON;
 	}
+
+	// 仅迁移仍保留原项目三项默认值的旧配置，避免覆盖已经自定义过的配置。
+	// 迁移完成后用版本标记保留用户后续手动关闭 ECH 或修改 PROXYIP 的选择。
+	const 订阅生成配置 = config_JSON.优选订阅生成 || (config_JSON.优选订阅生成 = {});
+	const 反代配置 = config_JSON.反代 || (config_JSON.反代 = {});
+	const 仍为原始默认配置 = !config_JSON._forkedgetunnelDefaultsVersion &&
+		(!订阅生成配置.SUBNAME || 订阅生成配置.SUBNAME === 'edgetunnel') &&
+		(config_JSON.ECH === undefined || config_JSON.ECH === false) &&
+		(!反代配置[_p] || 反代配置[_p] === 'auto');
+	if (仍为原始默认配置) {
+		订阅生成配置.SUBNAME = 'forkedgetunnel';
+		config_JSON.ECH = true;
+		反代配置[_p] = 'proxyip.cmliussss.net';
+		config_JSON._forkedgetunnelDefaultsVersion = 1;
+		try {
+			await env.KV.put('config.json', JSON.stringify(config_JSON, null, 2));
+		} catch (error) {
+			console.warn('写入 forkedgetunnel 默认配置迁移失败:', error?.message || error);
+		}
+	}
+	if (!订阅生成配置.SUBNAME) 订阅生成配置.SUBNAME = 'forkedgetunnel';
+	if (!反代配置[_p]) 反代配置[_p] = 'proxyip.cmliussss.net';
 
 	if (!config_JSON.订阅转换配置.SUBLIST) config_JSON.订阅转换配置.SUBLIST = false;
 	if (!config_JSON.订阅转换配置.UDP) config_JSON.订阅转换配置.UDP = false;
@@ -5812,7 +5835,7 @@ async function 读取config_JSON(env, hostname, userID, UA = "Mozilla/5.0", 重�
 	if (!config_JSON.TLS分片 && config_JSON.TLS分片 !== null) config_JSON.TLS分片 = null;
 	const TLS分片参数 = config_JSON.TLS分片 == 'Shadowrocket' ? `&fragment=${encodeURIComponent('1,40-60,30-50,tlshello')}` : config_JSON.TLS分片 == 'Happ' ? `&fragment=${encodeURIComponent('3,1,tlshello')}` : '';
 	if (!config_JSON.Fingerprint) config_JSON.Fingerprint = "chrome";
-	if (!config_JSON.ECH) config_JSON.ECH = false;
+	if (typeof config_JSON.ECH !== 'boolean') config_JSON.ECH = true;
 	if (!config_JSON.ECHConfig) config_JSON.ECHConfig = { DNS: Ali_DoH, SNI: ECH_SNI };
 	const ECHLINK参数 = config_JSON.ECH ? `&ech=${encodeURIComponent((config_JSON.ECHConfig.SNI ? config_JSON.ECHConfig.SNI + '+' : '') + config_JSON.ECHConfig.DNS)}` : '';
 	const { type: 传输协议, 路径字段名, 域名字段名 } = 获取传输协议配置(config_JSON);
