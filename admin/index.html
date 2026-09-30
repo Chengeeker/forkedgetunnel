@@ -13669,7 +13669,7 @@
 									<summary class="advanced-settings-summary">
 										<span class="advanced-settings-copy">
 											<span class="advanced-settings-title">高级设置</span>
-											<span class="advanced-settings-meta">待测数量、超时、并发、端口</span>
+											<span class="advanced-settings-meta">待测数量、超时、并发、测速并发、端口</span>
 										</span>
 										<svg class="advanced-settings-chevron" viewBox="0 0 24 24" aria-hidden="true">
 											<path d="M6 9l6 6 6-6"></path>
@@ -13691,6 +13691,11 @@
 												<label for="threadsInput">并发线程</label>
 												<input class="input" id="threadsInput" type="number" min="1" max="32"
 													step="1" value="16">
+											</div>
+											<div class="field">
+												<label for="speedThreadsInput">测速并发</label>
+												<input class="input" id="speedThreadsInput" type="number" min="1" max="32"
+													step="1" value="10" title="一键测速同时测试的地址数">
 											</div>
 											<div class="field">
 												<div class="label-row">
@@ -14009,6 +14014,7 @@
 					limitInput: $("#limitInput"),
 					timeoutInput: $("#timeoutInput"),
 					threadsInput: $("#threadsInput"),
+					speedThreadsInput: $("#speedThreadsInput"),
 					portInput: $("#portInput"),
 					latencyBtn: $("#latencyBtn"),
 					latencyStatus: $("#latencyStatus"),
@@ -14056,7 +14062,7 @@
 						els.ipInput.value = "";
 						updateEditorMeta();
 					});
-					[els.limitInput, els.timeoutInput, els.threadsInput, els.portInput].forEach((input) => {
+					[els.limitInput, els.timeoutInput, els.threadsInput, els.speedThreadsInput, els.portInput].forEach((input) => {
 						input.addEventListener("change", () => clampNumberInput(input));
 					});
 					els.latencyBtn.addEventListener("click", async () => {
@@ -14924,7 +14930,7 @@
 					if (!targets.length) return;
 
 					const settings = readSettings();
-					const concurrency = Math.min(4, Math.max(1, Math.ceil(settings.threads / 8)));
+					const concurrency = Math.max(1, Math.min(settings.speedThreads, targets.length));
 					const run = {
 						stopped: false,
 						controllers: new Set(),
@@ -15046,7 +15052,7 @@
 				async function startAllSpeedTests() {
 					if (!state.results.length) return;
 					const settings = readSettings();
-					const concurrency = Math.max(1, Math.ceil(settings.threads / 8));
+					const concurrency = Math.max(1, Math.min(settings.speedThreads, state.results.length));
 					const run = {
 						stopped: false,
 						controllers: new Set(),
@@ -16278,11 +16284,12 @@
 				}
 
 				function readSettings() {
-					[els.limitInput, els.timeoutInput, els.threadsInput, els.portInput].forEach((input) => clampNumberInput(input));
+					[els.limitInput, els.timeoutInput, els.threadsInput, els.speedThreadsInput, els.portInput].forEach((input) => clampNumberInput(input));
 					return {
 						limit: Number(els.limitInput.value),
 						timeout: Number(els.timeoutInput.value),
 						threads: Number(els.threadsInput.value),
+						speedThreads: Number(els.speedThreadsInput.value),
 						port: Number(els.portInput.value)
 					};
 				}
