@@ -21,7 +21,7 @@
 
 - 🛡️ **协议支持**：支持 VLESS、Trojan、Shadowsocks 等主流协议，深度集成加密传输。
 - 📊 **管理面板**：内置可视化后台，支持实时配置修改、日志查看及流量统计。
-- 🛠️ **部署灵活**：完整适配 CF Workers 及 CF Pages (GitHub / 上传)。
+- 🛠️ **部署灵活**：完整适配 CF Workers 及 CF Pages (GitHub / 上传)，仓库已内置管理面板，Pages 部署无需再创建第二个项目。
 - 🔄 **订阅系统**：内置自动订阅生成及混淆转换，适配主流客户端（Clash, Sing-box, Surge 等）。
 - ⚡ **性能加速**：支持自定义 ProxyIP、SOCKS5/HTTP 链式代理及优选 API，优化网络延迟。
 - 🌐 **多台适配**：完美适配 Windows, Android, iOS, MacOS 及各种软路由固件。
@@ -93,9 +93,9 @@
 
 1. 部署 CF Pages：
    - 在 Github 上先 Fork 本项目，并点上 Star !!!
-   - 在 CF Pages 控制台中选择 `连接到 Git`后，选中 `edgetunnel`项目后点击 `开始设置`。
-   - 在 `设置构建和部署`页面下方，选择 `环境变量（高级）`后并 `添加变量`
-     变量名称填写**ADMIN**，值则为你的管理员密码，后点击 `保存并部署`即可。
+   - 在 CF Pages 控制台中选择 `连接到 Git` 后，选中你自己的 `forkedgetunnel` 项目，按照原项目的构建设置点击 `开始设置`。
+   - 在 `设置构建和部署`页面下方，选择 `环境变量（高级）`后并 `添加变量`：变量名称填写**ADMIN**，值则为你的管理员密码，后点击 `保存并部署`即可。
+   - 本仓库已经同时包含 `_worker.js` 和 `admin/`、`login/` 等管理页面目录，Pages 会优先使用同一仓库内的管理面板，不需要再部署 `EDT-Pages.github.io`。
 
 2. 绑定 KV 命名空间：
    - 在 `设置`选项卡中选择 `绑定` > `+ 添加` > `KV 命名空间`，然后选择一个已有的命名空间或创建一个新的命名空间进行绑定。
@@ -121,7 +121,7 @@
 | **ADMIN** | ✅ | `123456` | 后台管理面板登录密码 |
 | **KEY** | ❌ | `CMLiussss` | 快速订阅路径密钥，访问 `/CMLiussss` 即可快速获取节点 |
 | **UUID** | ❌ | `90cd4a77-141a-43c9-991b-08263cfe9c10` | 强制固定UUID，只支持**UUIDv4**标准格式 |
-| **EDT_PAGES_URL** | ❌ | `https://your-pages.example.com` | 自定义管理面板静态站点根地址（不要包含 `/admin`）；默认使用官方 `https://edt-pages.github.io` |
+| **EDT_PAGES_URL** | ❌ | `https://your-pages.example.com` | 可选的外部管理面板回退地址（不要包含 `/admin`）；合并后的 Pages 部署无需填写，只有在使用普通 Worker 或想切换到外部面板时才需要 |
 | **PROXYIP** | ❌ | `proxyip.cmliussss.net:443` | 全局自定义反代 IP  |
 | **URL** | ❌ | `https://cloudflare-error-page-3th.pages.dev` | 默认主页伪装地址（可填写网页 URL 或 `1101`） |
 | **GO2SOCKS5** | ❌ | `blog.cmliussss.com`,`*.ip111.cn`,`*google.com` | 强制走 SOCKS5 的名单 (`*` 为全局，域名用逗号分隔) |

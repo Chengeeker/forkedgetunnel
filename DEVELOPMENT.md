@@ -2,39 +2,41 @@
 
 ## 在线优选批量测速
 
-- `edgetunnel` 的 `_worker.js` 只负责 Worker 后端；管理页面不是本仓库内的静态文件，而是通过 `Pages静态页面`（当前为 `https://edt-pages.github.io`）转发到独立的 `EDT-Pages/EDT-Pages.github.io` 仓库。
+- `edgetunnel` 的 `_worker.js` 负责 Worker 后端，管理面板原本位于独立的 `EDT-Pages/EDT-Pages.github.io` 仓库。
 - 在线优选前端原本已经包含单条测速、批量测速 `startAllSpeedTests`、并发池和停止测速逻辑，缺陷是 `onlineOptimizeTemplate` 的速度列没有渲染 `#speedAllBtn` 控件，因此批量逻辑没有入口。
-- 本次修复只改独立面板仓库的 `admin/index.html`：在速度列标题旁增加“一键测速”按钮，复用现有批量测速逻辑；补充批量状态文本，并让标题在窄屏自动换行。完整补丁保存在 `patches/EDT-Pages-admin-speed.patch`。未引入依赖，也未修改 Worker 的测速协议或并发策略。
-- 当前批量测速仍沿用原实现：按“并发线程”设置换算测速并发，单个地址最多读取约 20,000,000 字节、最长 10 秒；批量测试可能产生较大的浏览器出口流量，用户可以点击同一按钮停止。
+- 面板 fork `Chengeeker/EDT-Pages.github.io` 已在 `ce389dd` 增加“一键测速”按钮。本仓库当前已将该版本的 `admin/index.html`、登录页、无配置提示页和登录页所需的 `cdn-cgi/trace` 静态资源纳入根目录，后续 Pages 部署直接使用这些文件。
+- 本次没有引入依赖，也没有修改 Worker 的测速协议或并发策略。批量测速仍沿用原实现：按“并发线程”设置换算测速并发，单个地址最多读取约 20,000,000 字节、最长 10 秒；批量测试可能产生较大的浏览器出口流量，用户可以点击同一按钮停止。
+
+## 合并部署实现
+
+- `_worker.js` 新增 `获取管理页面资源`：Cloudflare Pages Advanced mode 提供 `ASSETS` 绑定时，`/admin`、`/login`、`/noADMIN`、`/noKV` 和 `/cdn-cgi/trace` 优先从当前仓库读取；本地资源缺失时才回退到外部面板地址。
+- Pages 部署不需要额外的构建依赖或配置文件，现有 `_worker.js` 继续作为 Advanced mode 入口，静态目录与 Worker 位于同一个仓库根目录。
+- `EDT_PAGES_URL` 仍保留，作为普通 Worker 部署或需要切换外部面板时的兼容回退变量。合并后的 Pages 部署不需要设置它。
+- 这样主程序和管理页面只需要创建一个 Cloudflare Pages 项目、连接一个 GitHub 仓库即可。原来的 `EDT-Pages.github.io` fork 保留为面板源码来源和独立维护副本，但不再是合并部署的前置步骤。
+- 在线优选域名仍然跳转到独立的 `CF-Pages-BestCF` 项目（当前链接为 `https://bestcf.fxxk.dedyn.io/`）。它不是管理面板仓库的一部分，且其“优选延迟”本来就是批量流程；本次没有把第三方域名站点复制进来。
 
 ## 在线优选域名的边界
 
-- 面板中的“在线优选域名”不是 `EDT-Pages` 的内置页面，而是跳转到独立的 `CF-Pages-BestCF` 项目（当前链接为 `https://bestcf.fxxk.dedyn.io/`）。
+- 面板中的“在线优选域名”不是 `EDT-Pages` 的内置页面，而是跳转到独立的 `CF-Pages-BestCF` 项目。
 - 该项目当前的“优选延迟”按钮已经通过 `startLatencyRun` 和并发池批量遍历全部输入域名，不存在需要补上的“逐个点击延迟测试”入口。
 - 该项目没有下载速度列或可用于测量 Mbps 的下载端点，只有对候选域名 `/cdn-cgi/trace` 的延迟测量。不能把这个小型 trace 响应的耗时换算成下载速度，否则结果没有可靠含义；因此本次没有伪造域名 Mbps 测速功能。
 - 如果实际部署页面显示的行为与上述源代码不同，应先确认部署版本和来源。要增加域名真实下载测速，需要为所有候选域名约定一个可公开读取、大小稳定的测试资源或服务端点，再单独设计流量上限、并发和跨域策略。
 
-## 部署边界
+## 当前部署顺序
 
-仅修改本仓库的 `_worker.js` 不会改变已部署的管理面板。要让 IP 批量测速修复生效，需要把 `patches/EDT-Pages-admin-speed.patch` 应用到自己 fork 的 `EDT-Pages.github.io/admin/index.html` 并部署该静态站点，然后配置 `EDT_PAGES_URL` 指向自己的面板根地址；未配置时 Worker 仍会继续加载官方面板。
+现在只需要部署一个项目：
 
-域名优选若要使用自己的页面，需要另外 fork / 部署 `CF-Pages-BestCF`，并修改 `EDT-Pages` 中的域名优选跳转地址；本仓库不会直接修改第三方域名站点。
+1. 在 GitHub 上选择自己的 `forkedgetunnel` 仓库，在 Cloudflare Pages 中使用“连接到 Git”创建项目，生产分支选择 `main`，构建设置沿用原项目。
+2. 在 Pages 的生产环境变量中设置 `ADMIN`，并绑定 KV 命名空间，绑定名称必须是 `KV`。
+3. 保存并部署后访问主域名的 `/admin`。登录页和在线优选页面都来自同一个仓库，速度列旁边应显示“一键测速”。
+4. `EDT_PAGES_URL` 不需要填写。只有当使用普通 Worker（没有 Pages `ASSETS` 绑定），或者明确要使用另一个外部面板时，才填写外部面板根地址，且不要包含 `/admin`。
 
-## 实际部署顺序
-
-主程序和管理面板是两个独立的 Pages 项目，但部署方式都可以使用 Cloudflare 的“连接到 Git / GitHub”流程：
-
-1. 在第一个 Pages 项目中选择 `Chengeeker/forkedgetunnel`，生产分支选择 `main`，其余构建设置沿用原项目的部署方式；继续配置 `ADMIN` 和 `KV`。
-2. 在第二个 Pages 项目中选择 `Chengeeker/EDT-Pages.github.io`，生产分支选择 `main`，构建命令留空，输出目录使用仓库根目录，然后部署静态面板。
-3. 复制第二个项目生成的 `https://xxx.pages.dev` 地址，在第一个项目的生产环境变量中新增 `EDT_PAGES_URL`。这里只填写面板根地址，不要加 `/admin`。
-4. 保存变量并重新部署第一个项目。之后访问第一个项目的 `/admin`，登录后进入在线优选 IP，速度列旁边才会出现“一键测速”。
-
-如果不配置 `EDT_PAGES_URL`，主程序仍会加载官方面板，所以主程序可以正常运行，但看不到本次面板改动。先部署主程序还是先部署面板都可以；通常先部署面板拿到 `pages.dev` 地址，再配置主程序更直观。
+原先“主程序一个 Pages 项目、面板一个 Pages 项目、再配置 `EDT_PAGES_URL`”的流程已被当前合并方案取代；这条旧流程只作为兼容回退，不是新部署的必需步骤。
 
 ## 本次验证
 
-- `admin/index.html` 的脚本块可由 Node.js `new Function` 编译。
-- `#speedAllBtn` 和 `#speedStatus` 各存在一个，已有 `startAllSpeedTests` 绑定逻辑保持不变。
-- 对 `CF-Pages-BestCF` 源码完成只读审计，确认其延迟测速已是批量流程，且没有真实下载测速实现。
-- `git diff --check` 通过。
+- 合并前检查确认：批量测速逻辑已经存在，缺少的是页面入口；没有重复实现现成逻辑。
+- 面板 `admin/index.html` 的脚本块可由 Node.js `new Function` 编译；`#speedAllBtn` 和 `#speedStatus` 各存在一个，已有 `startAllSpeedTests` 绑定逻辑保持不变。
+- `_worker.js` 已改为本地 `ASSETS` 优先、外部面板回退；静态页面仅复制面板展示所需文件，动态的 `admin/config.json`、`admin/check`、`locations` 等仍由 Worker 原路由处理。
+- `git diff --check` 和 Node.js 语法检查应在推送前重新执行。
 - 按要求未进行真实浏览器出口网络和 Cloudflare 部署验证；这类验证由用户在符合中国直连网络条件的环境中自行完成，不能由静态语法检查替代。

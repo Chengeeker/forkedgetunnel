@@ -2,6 +2,28 @@
 let config_JSON, 缓存SOCKS5白名单 = null, 调试日志打印 = false;
 let SOCKS5白名单 = ['*tapecontent.net', '*cloudatacdn.com', '*loadshare.org', '*cdn-centaurus.com', 'scholar.google.com'];
 const Pages静态页面 = 'https://edt-pages.github.io';
+
+// Cloudflare Pages Advanced mode 会自动提供 ASSETS 绑定。合并部署时优先从
+// 当前仓库读取面板；没有 ASSETS（例如直接部署为普通 Worker）时回退到外部面板。
+async function 获取管理页面资源(request, env, 管理页面地址, 本地路径, 远程路径, search = '') {
+	const 明确指定外部面板 = String(env.EDT_PAGES_URL || '').trim();
+	if (!明确指定外部面板 && env.ASSETS && typeof env.ASSETS.fetch === 'function') {
+		try {
+			const 资源URL = new URL(request.url);
+			资源URL.pathname = 本地路径;
+			资源URL.search = search;
+			const 本地响应 = await env.ASSETS.fetch(new Request(资源URL.toString(), {
+				method: 'GET',
+				headers: request.headers,
+			}));
+			if (本地响应.status !== 404) return 本地响应;
+		} catch (error) {
+			console.warn('读取本地管理页面失败，改用外部面板:', error?.message || error);
+		}
+	}
+	return fetch(管理页面地址 + 远程路径 + search);
+}
+
 ///////////////////////////////////////////////////////全局常量和工具函数///////////////////////////////////////////////
 const WS早期数据最大字节 = 8 * 1024, WS早期数据最大头长度 = Math.ceil(WS早期数据最大字节 * 4 / 3) + 4;
 const 上行合包目标字节 = 20 * 1024, 上行队列最大字节 = 16 * 1024 * 1024, 上行队列最大条目 = 4096;
@@ -83,7 +105,7 @@ export default {
 			return await 处理叉HTTP请求(request, userID, 反代上下文);
 		} else {
 			if (url.protocol === 'http:') return Response.redirect(url.href.replace(`http://${url.hostname}`, `https://${url.hostname}`), 301);
-			if (!管理员密码) return fetch(管理页面地址 + '/noADMIN').then(r => { const headers = new Headers(r.headers); headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate'); headers.set('Pragma', 'no-cache'); headers.set('Expires', '0'); return new Response(r.body, { status: 404, statusText: r.statusText, headers }) });
+			if (!管理员密码) return 获取管理页面资源(request, env, 管理页面地址, '/noADMIN/index.html', '/noADMIN').then(r => { const headers = new Headers(r.headers); headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate'); headers.set('Pragma', 'no-cache'); headers.set('Expires', '0'); return new Response(r.body, { status: 404, statusText: r.statusText, headers }) });
 			if (env.KV && typeof env.KV.get === 'function') {
 				const 区分大小写访问路径 = url.pathname.slice(1);
 				if (区分大小写访问路径 === 加密秘钥 && 加密秘钥 !== '勿动此默认密钥，有需求请自行通过添加变量KEY进行修改') {//快速订阅
@@ -105,7 +127,7 @@ export default {
 							return 响应;
 						}
 					}
-					return fetch(管理页面地址 + '/login');
+					return 获取管理页面资源(request, env, 管理页面地址, '/login/index.html', '/login');
 				} else if (访问路径 === 'admin' || 访问路径.startsWith('admin/')) {//验证cookie后响应管理页面
 					const cookies = request.headers.get('Cookie') || '';
 					const authCookie = cookies.split(';').find(c => c.trim().startsWith('auth='))?.split('=')[1];
@@ -298,7 +320,7 @@ export default {
 					}
 
 					ctx.waitUntil(请求日志记录(env, request, 访问IP, 'Admin_Login', config_JSON));
-					return fetch(管理页面地址 + '/admin' + url.search);
+					return 获取管理页面资源(request, env, 管理页面地址, '/admin/index.html', '/admin', url.search);
 				} else if (访问路径 === 'logout' || uuidRegex.test(访问路径)) {//清除cookie并跳转到登录页面
 					const 响应 = new Response('重定向中...', { status: 302, headers: { 'Location': '/login' } });
 					响应.headers.set('Set-Cookie', 'auth=; Path=/; Max-Age=0; HttpOnly');
@@ -496,12 +518,14 @@ export default {
 						}
 						return new Response(订阅内容, { status: 200, headers: responseHeaders });
 					}
+				} else if (访问路径 === 'cdn-cgi/trace') {//面板登录页需要的网络位置探测文件
+					return 获取管理页面资源(request, env, 管理页面地址, '/cdn-cgi/trace', '/cdn-cgi/trace', url.search);
 				} else if (访问路径 === 'locations') {//反代locations列表
 					const cookies = request.headers.get('Cookie') || '';
 					const authCookie = cookies.split(';').find(c => c.trim().startsWith('auth='))?.split('=')[1];
 					if (authCookie && authCookie == await MD5MD5(UA + 加密秘钥 + 管理员密码)) return fetch(new Request('https://speed.cloudflare.com/locations', { headers: { 'Referer': 'https://speed.cloudflare.com/' } }));
 				} else if (访问路径 === 'robots.txt') return new Response('User-agent: *\nDisallow: /', { status: 200, headers: { 'Content-Type': 'text/plain; charset=UTF-8' } });
-			} else if (!envUUID) return fetch(管理页面地址 + '/noKV').then(r => { const headers = new Headers(r.headers); headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate'); headers.set('Pragma', 'no-cache'); headers.set('Expires', '0'); return new Response(r.body, { status: 404, statusText: r.statusText, headers }) });
+			} else if (!envUUID) return 获取管理页面资源(request, env, 管理页面地址, '/noKV/index.html', '/noKV').then(r => { const headers = new Headers(r.headers); headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate'); headers.set('Pragma', 'no-cache'); headers.set('Expires', '0'); return new Response(r.body, { status: 404, statusText: r.statusText, headers }) });
 		}
 
 		let 伪装页URL = env.URL || 'nginx';
