@@ -290,6 +290,26 @@
 			outline-offset: 2px;
 		}
 
+		.custom-sort-btn {
+			min-width: 84px;
+			padding: 6px 12px;
+			border-radius: 8px;
+			font-size: 13px;
+			line-height: 1.2;
+			letter-spacing: 0;
+			white-space: nowrap;
+			box-shadow: 0 2px 8px rgba(148, 163, 184, 0.22);
+		}
+
+		.custom-sort-btn:hover {
+			transform: translateY(-1px);
+			box-shadow: 0 4px 12px rgba(148, 163, 184, 0.32);
+		}
+
+		.custom-sort-btn:active {
+			transform: translateY(0);
+		}
+
 		.input-wrapper {
 			position: relative
 		}
@@ -10525,6 +10545,9 @@
 							<label for="customIPs">自定义优选</label>
 							<button type="button" class="inline-hint-btn" title="查看自定义优选 填写说明"
 								onclick="showAuthTokenHelpModal('customIPs')" aria-label="查看自定义优选 填写说明">!</button>
+							<button type="button" class="btn btn-secondary custom-sort-btn" id="sortCustomIPsBtn"
+								onclick="sortCustomOptimizeIPs()" title="按端口、国家/地区和网速重新归类排序"
+								aria-label="按端口、国家地区和网速重新归类排序">一键排序</button>
 						</div>
 						<div class="line-editor line-editor-wrap" id="subCustomEditor">
 							<div class="gutter" aria-hidden="true">
@@ -19672,7 +19695,9 @@
 
 		async function loadCustomIPs() {
 			const textarea = document.getElementById('customIPs');
+			const sortButton = document.getElementById('sortCustomIPsBtn');
 			textarea.disabled = true;
+			if (sortButton) sortButton.disabled = true;
 			textarea.value = '正在加载...';
 			if (textarea._refreshLineEditor) textarea._refreshLineEditor();
 
@@ -19694,8 +19719,192 @@
 				textarea.value = '';
 			} finally {
 				textarea.disabled = false;
+				if (sortButton) sortButton.disabled = false;
 				if (textarea._refreshLineEditor) textarea._refreshLineEditor();
 			}
+		}
+
+		const CUSTOM_OPTIMIZE_COUNTRY_ORDER = Object.freeze([
+			'HK', 'CN', 'MO', 'TW', 'JP', 'KR', 'SG', 'MY', 'TH', 'VN', 'PH', 'ID',
+			'AU', 'IN', 'AE', 'RU', 'DE', 'NL', 'GB', 'FR', 'CA', 'US'
+		]);
+		const CUSTOM_OPTIMIZE_COUNTRY_RANK = new Map(
+			CUSTOM_OPTIMIZE_COUNTRY_ORDER.map((code, index) => [code, index])
+		);
+		const CUSTOM_OPTIMIZE_COUNTRY_ALIASES = Object.freeze({
+			'香港': 'HK', 'hong kong': 'HK',
+			'中国': 'CN', 'china': 'CN',
+			'澳门': 'MO', 'macau': 'MO', 'macao': 'MO',
+			'台湾': 'TW', 'taiwan': 'TW',
+			'日本': 'JP', 'japan': 'JP',
+			'韩国': 'KR', 'south korea': 'KR', 'korea': 'KR',
+			'新加坡': 'SG', 'singapore': 'SG',
+			'马来西亚': 'MY', 'malaysia': 'MY',
+			'泰国': 'TH', 'thailand': 'TH',
+			'越南': 'VN', 'vietnam': 'VN',
+			'菲律宾': 'PH', 'philippines': 'PH',
+			'印度尼西亚': 'ID', 'indonesia': 'ID',
+			'澳大利亚': 'AU', 'australia': 'AU',
+			'印度': 'IN', 'india': 'IN',
+			'阿联酋': 'AE', 'uae': 'AE', 'united arab emirates': 'AE',
+			'俄罗斯': 'RU', 'russia': 'RU',
+			'德国': 'DE', 'germany': 'DE',
+			'荷兰': 'NL', 'netherlands': 'NL',
+			'英国': 'GB', 'uk': 'GB', 'united kingdom': 'GB',
+			'法国': 'FR', 'france': 'FR',
+			'加拿大': 'CA', 'canada': 'CA',
+			'美国': 'US', 'usa': 'US', 'united states': 'US'
+		});
+
+		function getCustomOptimizeCountryCode(line) {
+			const tagMatch = line.match(/#\s*([^\s$]+)/);
+			if (tagMatch) {
+				const tag = tagMatch[1].replace(/[\[\](),，。:：]/g, '');
+				if (/^[a-z]{2}$/i.test(tag)) return tag.toUpperCase();
+				const tagLower = tag.toLowerCase();
+				if (CUSTOM_OPTIMIZE_COUNTRY_ALIASES[tagLower]) {
+					return CUSTOM_OPTIMIZE_COUNTRY_ALIASES[tagLower];
+				}
+			}
+
+			const lowerLine = line.toLowerCase();
+			for (const [alias, code] of Object.entries(CUSTOM_OPTIMIZE_COUNTRY_ALIASES)) {
+				if (lowerLine.includes(alias.toLowerCase())) return code;
+			}
+			return '';
+		}
+
+		function parseCustomOptimizeLine(raw, index) {
+			const line = String(raw ?? '').trim();
+			const result = {
+				raw: line,
+				index,
+				isNode: false,
+				port: null,
+				country: getCustomOptimizeCountryCode(line),
+				speedMbps: null
+			};
+			if (!line) return result;
+
+			const addressToken = line.split('#', 1)[0].trim().split(/\s+/, 1)[0];
+			if (!addressToken || /^(?:https?|sub):\/\//i.test(addressToken)) return result;
+
+			let host = addressToken;
+			let port = 443;
+			const bracketedHost = addressToken.match(/^\[([^\]]+)\](?::(\d+))?$/);
+			if (bracketedHost) {
+				host = bracketedHost[1];
+				if (bracketedHost[2]) port = Number(bracketedHost[2]);
+			} else {
+				const portMatch = addressToken.match(/:(\d+)$/);
+				if (portMatch) {
+					host = addressToken.slice(0, -portMatch[0].length);
+					port = Number(portMatch[1]);
+				}
+			}
+
+			const validHost = bracketedHost
+				? /^[0-9a-f:.]+$/i.test(host)
+				: /^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?$/i.test(host);
+			const validPort = Number.isInteger(port) && port >= 1 && port <= 65535;
+			if (!validHost || !validPort) return result;
+
+			result.isNode = true;
+			result.port = port;
+			const speedMatch = line.match(/(\d+(?:\.\d+)?)\s*Mbps\b/i);
+			if (speedMatch) {
+				const speed = Number(speedMatch[1]);
+				if (Number.isFinite(speed)) result.speedMbps = speed;
+			}
+			return result;
+		}
+
+		function getCustomOptimizePortGroup(port) {
+			if (port === 443) return 0;
+			if (port === 2053) return 1;
+			if (Number.isInteger(port)) return 2;
+			return 3;
+		}
+
+		function getCustomOptimizeCountryRank(country) {
+			return CUSTOM_OPTIMIZE_COUNTRY_RANK.has(country)
+				? CUSTOM_OPTIMIZE_COUNTRY_RANK.get(country)
+				: CUSTOM_OPTIMIZE_COUNTRY_ORDER.length;
+		}
+
+		function compareCustomOptimizeLines(left, right) {
+			if (left.isNode !== right.isNode) return left.isNode ? -1 : 1;
+			if (!left.isNode) return left.index - right.index;
+
+			const leftPortGroup = getCustomOptimizePortGroup(left.port);
+			const rightPortGroup = getCustomOptimizePortGroup(right.port);
+			if (leftPortGroup !== rightPortGroup) return leftPortGroup - rightPortGroup;
+			if (leftPortGroup === 2 && left.port !== right.port) return left.port - right.port;
+
+			const leftCountryRank = getCustomOptimizeCountryRank(left.country);
+			const rightCountryRank = getCustomOptimizeCountryRank(right.country);
+			if (leftCountryRank !== rightCountryRank) return leftCountryRank - rightCountryRank;
+			if (left.country !== right.country) return left.country < right.country ? -1 : 1;
+
+			const leftHasSpeed = Number.isFinite(left.speedMbps);
+			const rightHasSpeed = Number.isFinite(right.speedMbps);
+			if (leftHasSpeed !== rightHasSpeed) return leftHasSpeed ? -1 : 1;
+			if (leftHasSpeed && left.speedMbps !== right.speedMbps) return right.speedMbps - left.speedMbps;
+
+			// 同端口、同地区、同网速时保持原始顺序；不使用延时作为第二排序依据。
+			return left.index - right.index;
+		}
+
+		function sortCustomOptimizeText(value) {
+			const original = String(value ?? '');
+			const entries = original
+				.split(/\r\n?|\n/)
+				.map((line, index) => parseCustomOptimizeLine(line, index))
+				.filter((entry) => entry.raw);
+			const nodeCount = entries.filter((entry) => entry.isNode).length;
+			if (!nodeCount) return { text: original, nodeCount: 0, changed: false };
+
+			entries.sort(compareCustomOptimizeLines);
+			const output = [];
+			let previousGroup = null;
+			for (const entry of entries) {
+				const group = entry.isNode
+					? `${getCustomOptimizePortGroup(entry.port)}:${entry.port ?? '?'}:${entry.country || '?'}`
+					: 'unknown';
+				if (output.length && group !== previousGroup) output.push('');
+				output.push(entry.raw);
+				previousGroup = group;
+			}
+
+			const text = output.join('\n');
+			return { text, nodeCount, changed: text !== original.trim() };
+		}
+
+		function sortCustomOptimizeIPs() {
+			const textarea = document.getElementById('customIPs');
+			if (!textarea) {
+				showToast('未找到自定义优选地址输入框', 'error');
+				return;
+			}
+			if (textarea.disabled) {
+				showToast('自定义优选地址正在加载，请稍候', 'warning');
+				return;
+			}
+
+			const result = sortCustomOptimizeText(textarea.value);
+			if (!result.nodeCount) {
+				showToast('没有识别到可排序的节点地址', 'warning');
+				return;
+			}
+			if (!result.changed) {
+				showToast('当前内容已经按规则排序', 'info');
+				return;
+			}
+
+			textarea.value = result.text;
+			if (textarea._refreshLineEditor) textarea._refreshLineEditor();
+			markModified('sub');
+			showToast(`✅ 已按端口、地区和网速排序 ${result.nodeCount} 条节点`, 'success');
 		}
 
 		function updateIPMode() {
