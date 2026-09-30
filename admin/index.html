@@ -7766,6 +7766,76 @@
 
 		.home-broadband-help {
 			margin-top: 14px;
+			border: 1px solid var(--border-color);
+			border-radius: 8px;
+			background: var(--bg-primary);
+			overflow: hidden;
+		}
+
+		.home-broadband-help-summary {
+			display: flex;
+			align-items: center;
+			justify-content: space-between;
+			gap: 12px;
+			min-height: 42px;
+			padding: 10px 12px;
+			cursor: pointer;
+			list-style: none;
+			user-select: none;
+		}
+
+		.home-broadband-help-summary::-webkit-details-marker {
+			display: none;
+		}
+
+		.home-broadband-help-summary:hover {
+			background: rgba(37, 99, 235, 0.06);
+		}
+
+		.home-broadband-help-copy {
+			display: flex;
+			align-items: baseline;
+			flex: 1 1 auto;
+			gap: 10px;
+			min-width: 0;
+		}
+
+		.home-broadband-help-title {
+			color: var(--text-primary);
+			font-size: 13px;
+			font-weight: 700;
+			white-space: nowrap;
+		}
+
+		.home-broadband-help-meta {
+			min-width: 0;
+			overflow: hidden;
+			color: var(--text-secondary);
+			font-size: 12px;
+			text-overflow: ellipsis;
+			white-space: nowrap;
+		}
+
+		.home-broadband-help-chevron {
+			display: inline-flex;
+			width: 18px;
+			height: 18px;
+			align-items: center;
+			justify-content: center;
+			color: var(--text-secondary);
+			font-size: 20px;
+			line-height: 14px;
+			transition: transform 0.15s ease;
+		}
+
+		.home-broadband-help[open] .home-broadband-help-chevron {
+			transform: rotate(180deg);
+		}
+
+		.home-broadband-help-body {
+			padding: 12px;
+			border-top: 1px solid var(--border-color);
+			background: var(--bg-secondary);
 		}
 
 		.home-broadband-help-list {
@@ -7789,14 +7859,20 @@
 			padding: 10px 12px;
 			border: 1px solid #ffe2a6;
 			border-radius: 8px;
-			background: var(--amber-soft);
-			color: var(--amber);
+			background: var(--amber-soft, #fff7e6);
+			color: var(--amber, #b7791f);
 			font-size: 12px;
 			line-height: 1.6;
 		}
 
 		html.dark-mode .network-tip {
 			color: #999;
+		}
+
+		html.dark-mode .home-broadband-help-warning {
+			border-color: rgba(251, 191, 36, 0.35);
+			background: rgba(251, 191, 36, 0.16);
+			color: #fbbf24;
 		}
 
 		.loading-spinner {
@@ -10581,17 +10657,15 @@
 						</div>
 					</div>
 					<div class="network-tip">· 开启并保存后，上方会显示专用的「Clash 家宽订阅」链接；普通订阅不会改变。</div>
-					<details class="settings-block advanced-settings home-broadband-help" open>
-						<summary class="advanced-settings-summary">
-							<span class="advanced-settings-copy">
-								<span class="advanced-settings-title">免费家宽链式怎么用？</span>
-								<span class="advanced-settings-meta">CF 前置 → VPN Gate 志愿者出口 · 仅支持 mihomo / Clash Meta</span>
+					<details class="home-broadband-help" open>
+						<summary class="home-broadband-help-summary">
+							<span class="home-broadband-help-copy">
+								<span class="home-broadband-help-title">免费家宽链式怎么用？</span>
+								<span class="home-broadband-help-meta">CF 前置 → VPN Gate 志愿者出口 · 仅支持 mihomo / Clash Meta</span>
 							</span>
-							<svg class="advanced-settings-chevron" viewBox="0 0 24 24" aria-hidden="true">
-								<path d="m6 9 6 6 6-6" />
-							</svg>
+							<span class="home-broadband-help-chevron" aria-hidden="true">⌄</span>
 						</summary>
-						<div class="advanced-settings-body">
+						<div class="home-broadband-help-body">
 							<ol class="home-broadband-help-list">
 								<li><strong>开启并保存：</strong>勾选上面的「开启免费家宽链式」，点击本模块底部的「保存」。保存后，页面顶部「获取节点链接」才会显示「Clash 家宽订阅」。</li>
 								<li><strong>导入专用链接：</strong>复制「Clash 家宽订阅」，在 mihomo / Clash Meta 1.19.25+ 中作为<strong>配置文件/订阅配置</strong>导入，不要把它当作普通 VLESS 节点链接使用。</li>
@@ -12151,15 +12225,15 @@
 				}
 
 				.advanced-settings-chevron {
+					display: inline-flex;
 					width: 18px;
 					height: 18px;
+					align-items: center;
+					justify-content: center;
 					color: var(--muted);
-					fill: none;
 					flex: 0 0 auto;
-					stroke: currentColor;
-					stroke-linecap: round;
-					stroke-linejoin: round;
-					stroke-width: 2;
+					font-size: 20px;
+					line-height: 14px;
 					transition: transform 0.15s ease;
 				}
 
@@ -13803,9 +13877,7 @@
 											<span class="advanced-settings-title">高级设置</span>
 											<span class="advanced-settings-meta">待测数量、超时、并发、测速并发、端口</span>
 										</span>
-										<svg class="advanced-settings-chevron" viewBox="0 0 24 24" aria-hidden="true">
-											<path d="M6 9l6 6 6-6"></path>
-										</svg>
+										<span class="advanced-settings-chevron" aria-hidden="true">⌄</span>
 									</summary>
 									<div class="advanced-settings-body">
 										<div class="form-grid compact">
