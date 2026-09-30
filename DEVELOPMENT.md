@@ -40,6 +40,18 @@
 - 因此，当前仓库不会把 `proxyip.cmliussss.net` 强行塞进 CF CDN 域名优选逻辑，也不会把连通性探测结果显示成 Mbps。要增加真实下载测速，仍需要目标服务提供公开、大小稳定的测试资源或专用测速端点。
 - 如果实际部署页面显示的行为与上述源代码不同，应先确认部署版本和来源。要增加域名真实下载测速，需要为所有候选域名约定一个可公开读取、大小稳定的测试资源或服务端点，再单独设计流量上限、并发和跨域策略。
 
+## 可选免费家宽链式
+
+- 功能定位：这不是 Cloudflare 直接提供的住宅出口，而是“客户端 → 当前 fork 的 CF Worker 节点 → VPN Gate 志愿者共享 OpenVPN 节点 → 目标站”的链式连接。VPN Gate 的节点是公开志愿者资源，不能承诺住宅属性、可用率或隐私；因此 UI 和订阅注释都使用“志愿者共享节点”，没有把它宣传成稳定家宽。
+- 资料依据：借鉴 [byJoey/cfnew](https://github.com/byJoey/cfnew) 中的链式思路和公开数据字段，但没有直接复制其实现；节点清单使用 [VPN Gate 官方 API](https://www.vpngate.net/api/iphone/)，链式字段依据 [mihomo OpenVPN 配置](https://wiki.metacubex.one/en/config/proxies/openvpn/) 和 [dialer-proxy 配置](https://wiki.metacubex.one/en/config/proxies/dialer-proxy/) 实现。
+- 配置入口：`订阅转换配置.免费家宽` 默认为 `false`。管理面板在该模块增加「开启免费家宽链式」复选框；开启并保存后，顶部「获取节点链接」才显示独立的 Clash 家宽订阅链接。正常的 Base64、Clash、Sing-box、Surge 等订阅路径不改变。
+- 订阅接口：家宽链接使用当前订阅 token 加 `target=home` 请求，例如 `/sub?token=...&target=home`；也兼容 `target=vg`、`target=jk` 和 `target=家宽`。未开启时返回 403，清单拉取或解析失败时返回 503，不覆盖客户端已有订阅。
+- 节点处理：Worker 通过 HTTPS 拉取 VPN Gate API，只接受 TCP OpenVPN 配置，过滤 `public-vpn-*` 主机和 `219.100.37.*` 官方节点网段，按 API 的 Speed 字段降序去重，最多保留 48 个节点。VPN Gate 公开账号固定为 `vpn/vpn`；CA、证书、私钥和可用的 `tls-auth` 会写入 Clash YAML，并用 YAML 锚点复用重复证书内容。
+- 前置处理：使用当前请求域名和配置中的 `HOSTS`，最多生成 4 个 CF VLESS WS/TLS 前置节点；ECH、随机路径和跳过证书验证跟随现有配置。家宽 OpenVPN 节点统一设置 `dialer-proxy: ⚡ CF前置`，前置组使用 `url-test`，家宽自动组使用延迟探测的 `fallback`，并保留手动选择组。
+- 性能与兼容性：节点清单只在请求家宽订阅时拉取，并在当前 Worker isolate 内缓存 30 分钟；最大响应体 12 MiB、最大输出 48 个节点，避免普通订阅请求增加外部请求和 YAML 体积。订阅头部明确要求 mihomo / Clash Meta 1.19.25+，因为较老内核可能不识别 `openvpn` 或 `dialer-proxy` 类型；该链路只承载 TCP，不向 UDP 能力作出承诺。
+- 风险边界：VPN Gate 是公开共享网络，用户应避免通过不信任的落地节点传输敏感数据。当前实现坚持 HTTPS 拉取公开清单，没有为了兼容旧 TLS 而降级到 HTTP；请求 token 仍按现有订阅鉴权逻辑校验。
+- 验证：已完成 `_worker.js` 语法检查、管理页面内联脚本编译、离线伪造 VPN Gate CSV/OpenVPN 配置的解析和 YAML 生成检查，以及 `git diff --check`。没有进行 Cloudflare 部署、真实 VPN Gate 拨号或中国直连环境验收；这些需要用户在自己的部署环境中测试。
+
 ## 当前部署顺序
 
 现在只需要部署一个项目：

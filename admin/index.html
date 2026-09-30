@@ -3509,6 +3509,14 @@
 			display: block
 		}
 
+		.module .form-hint {
+			grid-column: 2;
+			margin-top: -12px;
+			color: var(--text-secondary);
+			font-size: 12px;
+			line-height: 1.5;
+		}
+
 		.module .form-group input,
 		.module .form-group select,
 		.module .form-group textarea {
@@ -3734,6 +3742,10 @@
 			#portSection {
 				grid-template-columns: 1fr;
 				gap: 10px
+			}
+
+			.module .form-hint {
+				grid-column: 1;
 			}
 
 			.proxy-protocol-wrapper {
@@ -10490,6 +10502,18 @@
 							</div>
 						</div>
 					</div>
+					<div class="form-group" id="homeBroadbandLinkGroup" style="display: none;">
+						<label for="homeBroadbandLink">Clash 家宽订阅</label>
+						<div class="input-wrapper subscription-link-wrapper">
+							<input type="text" id="homeBroadbandLink" title="Clash 家宽订阅（仅支持 mihomo / Clash Meta 1.19.25+）" readonly>
+							<div class="btn-container">
+								<button type="button" class="btn btn-qrcode" onclick="showQRCode('homeBroadbandLink')">📱二维码</button>
+								<button type="button" class="btn btn-primary"
+									onclick="copySubscription('homeBroadbandLink')">复制订阅</button>
+							</div>
+						</div>
+						<small class="form-hint">VPN Gate 志愿者共享节点，稳定性和住宅属性不保证；仅支持 mihomo / Clash Meta 1.19.25+。</small>
+					</div>
 					<div class="form-group">
 						<label for="singboxLink">SingBox订阅</label>
 						<div class="input-wrapper subscription-link-wrapper">
@@ -11149,7 +11173,18 @@
 								</div>
 							</div>
 						</div>
+						<div class="form-group" id="freeHomeGroup">
+							<div class="input-wrapper">
+								<div class="checkbox-group">
+									<input type="checkbox" id="freeHome" title="使用 CF 节点作为前置，通过 VPN Gate 志愿者 OpenVPN 节点作为落地"
+										onchange="updateHomeBroadbandLinkUI(); markModified('convert')">
+									<label for="freeHome" class="checkbox-label"
+										title="仅支持 mihomo / Clash Meta 1.19.25+，节点来自 VPN Gate 志愿者共享网络，稳定性和住宅属性不保证">开启免费家宽链式</label>
+								</div>
+							</div>
+						</div>
 					</div>
+					<div class="network-tip">· 开启后会在上方显示专用 Clash 家宽订阅，仅支持 mihomo / Clash Meta 1.19.25+。</div>
 
 					<div class="module-footer">
 						<div class="btn-group">
@@ -19478,6 +19513,8 @@
 			document.getElementById('base64Link').value = `https://${host}/sub?token=${token}&b64`;
 			document.getElementById('clashLink').value = `https://${host}/sub?token=${token}&clash`;
 			document.getElementById('singboxLink').value = `https://${host}/sub?token=${token}&sb`;
+			const homeBroadbandLink = document.getElementById('homeBroadbandLink');
+			if (homeBroadbandLink) homeBroadbandLink.value = `https://${host}/sub?token=${token}&target=home`;
 
 			// 编辑订阅生成
 			const local = currentConfig.优选订阅生成?.local ?? true;
@@ -21066,6 +21103,14 @@
 			});
 		}
 
+		function updateHomeBroadbandLinkUI(enabled = null) {
+			const checkbox = document.getElementById('freeHome');
+			const linkGroup = document.getElementById('homeBroadbandLinkGroup');
+			if (!linkGroup) return;
+			const isEnabled = enabled === null ? Boolean(checkbox?.checked) : Boolean(enabled);
+			linkGroup.style.display = isEnabled ? '' : 'none';
+		}
+
 		function handleTLSFragmentChange(type) {
 			const shadowrocket = document.getElementById('tlsFragmentShadowrocket');
 			const happ = document.getElementById('tlsFragmentHapp');
@@ -21666,6 +21711,11 @@
 		}
 
 		function syncSubListOption() {
+			const freeHomeCheckbox = document.getElementById('freeHome');
+			const freeHomeEnabled = currentConfig.订阅转换配置?.免费家宽 === true;
+			if (freeHomeCheckbox) freeHomeCheckbox.checked = freeHomeEnabled;
+			updateHomeBroadbandLinkUI(freeHomeEnabled);
+
 			const subListGroup = document.getElementById('subListGroup');
 			const hasSubList = currentConfig.订阅转换配置?.SUBLIST !== undefined;
 
@@ -21740,7 +21790,8 @@
 			currentConfig.订阅转换配置 = {
 				SUBAPI: document.getElementById('subAPI').value,
 				SUBCONFIG: document.getElementById('subConfig').value,
-				SUBEMOJI: document.getElementById('emoji').checked
+				SUBEMOJI: document.getElementById('emoji').checked,
+				免费家宽: document.getElementById('freeHome')?.checked === true
 			};
 			if (hasSubList) {
 				currentConfig.订阅转换配置.SUBLIST = document.getElementById('subList').checked;

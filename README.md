@@ -24,6 +24,7 @@
 - 🛠️ **部署灵活**：完整适配 CF Workers 及 CF Pages (GitHub / 上传)，仓库已内置管理面板，Pages 部署无需再创建第二个项目。
 - 🔄 **订阅系统**：内置自动订阅生成及混淆转换，适配主流客户端（Clash, Sing-box, Surge 等）。
 - ⚡ **性能加速**：支持自定义 ProxyIP、SOCKS5/HTTP 链式代理及优选 API，优化网络延迟。
+- 🏠 **可选家宽链式**：可在管理面板生成仅供 mihomo / Clash Meta 使用的 VPN Gate 志愿者节点链式订阅；它不保证住宅属性或稳定性，默认关闭。
 - 🌐 **多台适配**：完美适配 Windows, Android, iOS, MacOS 及各种软路由固件。
 
 ---
@@ -111,6 +112,14 @@
    - 访问 `https://lizi.fuck.cloudns.biz/admin` 输入管理员密码即可登录后台。
 
 </details>
+
+---
+
+## 🏠 可选免费家宽链式
+
+部署完成并登录管理面板后，在「订阅转换配置」中勾选「开启免费家宽链式」并保存，顶部的订阅链接区域会显示单独的「Clash 家宽订阅」。这个订阅使用当前 CF 节点作为前置，通过 mihomo 的 `dialer-proxy` 将 TCP OpenVPN 连接转发到 VPN Gate 的公开志愿者节点。
+
+请注意：这里的“免费家宽”不是 Cloudflare 提供的住宅网络，也不保证出口一定是家庭宽带；VPN Gate 节点由志愿者共享，可能掉线、拥挤或属于非住宅网络，运营者也可能观察经过其节点的流量。它只面向 mihomo / Clash Meta 1.19.25 及以上版本，当前只生成 TCP 链路，普通订阅和其他客户端订阅不受影响。不开启时，Worker 不会请求 VPN Gate 节点清单。
 
 ---
 

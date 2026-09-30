@@ -1,6 +1,7 @@
 ﻿const Version = '2026-09-22 20:01:17';
 let config_JSON, 缓存SOCKS5白名单 = null, 调试日志打印 = false;
 let SOCKS5白名单 = ['*tapecontent.net', '*cloudatacdn.com', '*loadshare.org', '*cdn-centaurus.com', 'scholar.google.com'];
+let 免费家宽节点缓存 = null, 免费家宽节点缓存到期时间 = 0;
 const Pages静态页面 = 'https://edt-pages.github.io';
 
 // Cloudflare Pages Advanced mode 会自动提供 ASSETS 绑定。合并部署时优先从
@@ -347,6 +348,27 @@ export default {
 							"Profile-web-page-url": url.protocol + '//' + url.host + '/admin',
 							"Cache-Control": "no-store",
 						};
+						const 家宽订阅请求 = ['home', 'vg', 'jk', '家宽'].includes((url.searchParams.get('target') || '').trim().toLowerCase());
+						if (家宽订阅请求) {
+							if (config_JSON.订阅转换配置.免费家宽 !== true) {
+								return new Response('免费家宽链式未启用，请先在管理后台的「订阅转换配置」中开启。', {
+									status: 403,
+									headers: { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' }
+								});
+							}
+							try {
+								const 家宽订阅内容 = await 生成免费家宽订阅(config_JSON, url.hostname);
+								responseHeaders['content-type'] = 'application/x-yaml; charset=utf-8';
+								if (!ua.includes('mozilla')) responseHeaders['Content-Disposition'] = `attachment; filename*=utf-8''${encodeURIComponent(config_JSON.优选订阅生成.SUBNAME + '-home')}.yaml`;
+								return new Response(家宽订阅内容, { status: 200, headers: responseHeaders });
+							} catch (error) {
+								console.error('[免费家宽] 生成订阅失败:', error?.message || error);
+								return new Response('免费家宽节点暂时拉取失败：' + (error?.message || error) + '\n请稍后重试，客户端会继续保留上一份订阅。', {
+									status: 503,
+									headers: { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' }
+								});
+							}
+						}
 						if (config_JSON.CF.Usage.success) {
 							const pagesSum = config_JSON.CF.Usage.pages;
 							const workersSum = config_JSON.CF.Usage.workers;
@@ -5341,6 +5363,293 @@ async function Singbox订阅配置文件热补丁(SingBox_原始订阅内容, co
 	}
 }
 
+const 免费家宽节点源地址 = 'https://www.vpngate.net/api/iphone/';
+const 免费家宽缓存时长 = 30 * 60 * 1000;
+const 免费家宽最大节点数 = 48;
+const 免费家宽最大前置数 = 4;
+
+function 免费家宽YAML值(value) {
+	return JSON.stringify(String(value ?? ''));
+}
+
+function 拆分免费家宽CSV行(line) {
+	const fields = [];
+	let field = '';
+	let quoted = false;
+	for (let index = 0; index < line.length; index++) {
+		const char = line[index];
+		if (char === '"') {
+			if (quoted && line[index + 1] === '"') {
+				field += '"';
+				index++;
+			} else {
+				quoted = !quoted;
+			}
+		} else if (char === ',' && !quoted) {
+			fields.push(field.trim());
+			field = '';
+		} else {
+			field += char;
+		}
+	}
+	fields.push(field.trim());
+	return fields;
+}
+
+function 解码免费家宽Base64(value) {
+	let encoded = String(value || '').trim().replace(/^"|"$/g, '').replace(/\s+/g, '').replace(/-/g, '+').replace(/_/g, '/');
+	if (!encoded || encoded.length > 120000) return '';
+	encoded += '='.repeat((4 - encoded.length % 4) % 4);
+	try {
+		const binary = atob(encoded);
+		const bytes = new Uint8Array(binary.length);
+		for (let index = 0; index < binary.length; index++) bytes[index] = binary.charCodeAt(index);
+		return new TextDecoder().decode(bytes);
+	} catch (_) {
+		return '';
+	}
+}
+
+function 取免费家宽OpenVPN指令(configText, key) {
+	const match = configText.match(new RegExp('^[ \\t]*' + key + '[ \\t]+(.+?)[ \\t]*$', 'mi'));
+	return match ? match[1].trim() : '';
+}
+
+function 取免费家宽OpenVPN块(configText, key) {
+	const match = configText.match(new RegExp('<' + key + '>([\\s\\S]*?)<\\/' + key + '>', 'i'));
+	return match ? match[1].trim() : '';
+}
+
+function 清理免费家宽PEM(value) {
+	const lines = String(value || '').split(/\r?\n/).map(line => line.trim()).filter(Boolean);
+	if (lines.length < 3) return '';
+	if (!/^-----BEGIN [A-Za-z0-9][A-Za-z0-9 -]*-----$/.test(lines[0])) return '';
+	if (!/^-----END [A-Za-z0-9][A-Za-z0-9 -]*-----$/.test(lines[lines.length - 1])) return '';
+	const body = lines.slice(1, -1).filter(line => /^[A-Za-z0-9+/=]+$/.test(line));
+	if (!body.length) return '';
+	const pem = [lines[0], ...body, lines[lines.length - 1]].join('\n');
+	return pem.length <= 30000 ? pem : '';
+}
+
+function 是有效免费家宽主机(host) {
+	if (!host || host.length > 253 || /[\r\n/:]/.test(host)) return false;
+	if (/^(?:\d{1,3}\.){3}\d{1,3}$/.test(host)) {
+		return host.split('.').every(part => Number(part) >= 0 && Number(part) <= 255);
+	}
+	return /^[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?$/.test(host);
+}
+
+function 解析免费家宽清单(csvText) {
+	const candidates = [];
+	for (const rawLine of String(csvText || '').split(/\r?\n/)) {
+		const line = rawLine.trim();
+		if (!line || line.startsWith('*') || line.startsWith('#')) continue;
+		const fields = 拆分免费家宽CSV行(line);
+		if (fields.length < 15) continue;
+
+		const publicHost = String(fields[0] || '').trim();
+		const publicIP = String(fields[1] || '').trim();
+		// VPN Gate 自营 public-vpn 节点不代表志愿者家庭宽带，剔除它们。
+		if (publicHost.toLowerCase().startsWith('public-vpn-') || publicIP.startsWith('219.100.37.')) continue;
+
+		const configText = 解码免费家宽Base64(fields[fields.length - 1]);
+		if (!configText) continue;
+		const proto = (取免费家宽OpenVPN指令(configText, 'proto') || 'tcp').toLowerCase();
+		if (!proto.startsWith('tcp')) continue;
+		const remote = 取免费家宽OpenVPN指令(configText, 'remote').split(/\s+/);
+		const server = remote[0] || '';
+		const port = Number(remote[1]);
+		if (!是有效免费家宽主机(server) || !Number.isInteger(port) || port < 1 || port > 65535) continue;
+
+		const ca = 清理免费家宽PEM(取免费家宽OpenVPN块(configText, 'ca'));
+		if (!ca) continue;
+		const cert = 清理免费家宽PEM(取免费家宽OpenVPN块(configText, 'cert'));
+		const key = 清理免费家宽PEM(取免费家宽OpenVPN块(configText, 'key'));
+		const tlsAuth = 清理免费家宽PEM(取免费家宽OpenVPN块(configText, 'tls-auth'));
+		const country = String(fields[6] || 'XX').toUpperCase().replace(/[^A-Z]/g, '').slice(0, 2) || 'XX';
+		const speed = Number(String(fields[4] || '').replace(/[^\d.]/g, '')) || 0;
+		const safeCipher = (取免费家宽OpenVPN指令(configText, 'cipher') || 'AES-128-CBC').replace(/[^A-Za-z0-9_-]/g, '');
+		const safeAuth = (取免费家宽OpenVPN指令(configText, 'auth') || 'SHA1').replace(/[^A-Za-z0-9_-]/g, '');
+		const keyDirection = (取免费家宽OpenVPN指令(configText, 'key-direction') || '').replace(/[^01]/g, '');
+		candidates.push({
+			country,
+			server,
+			port,
+			speed,
+			cipher: safeCipher || 'AES-128-CBC',
+			auth: safeAuth || 'SHA1',
+			ca,
+			cert,
+			key,
+			tlsAuth,
+			keyDirection,
+		});
+	}
+
+	candidates.sort((left, right) => right.speed - left.speed);
+	const nodes = [];
+	const seen = new Set();
+	for (const candidate of candidates) {
+		const identity = `${candidate.server}:${candidate.port}`;
+		if (seen.has(identity)) continue;
+		seen.add(identity);
+		nodes.push(candidate);
+		if (nodes.length >= 免费家宽最大节点数) break;
+	}
+	return nodes;
+}
+
+async function 获取免费家宽节点() {
+	const now = Date.now();
+	if (免费家宽节点缓存 && now < 免费家宽节点缓存到期时间) return 免费家宽节点缓存;
+	const response = await fetch(免费家宽节点源地址, {
+		headers: {
+			'Accept': 'text/plain',
+			'User-Agent': 'forkedgetunnel/家宽链式'
+		},
+		cf: { cacheTtl: 1800, cacheEverything: true }
+	});
+	if (!response.ok) throw new Error(`VPN Gate 节点源返回 HTTP ${response.status}`);
+	const csvText = await response.text();
+	if (csvText.length > 12 * 1024 * 1024) throw new Error('VPN Gate 节点清单过大');
+	const nodes = 解析免费家宽清单(csvText);
+	if (!nodes.length) throw new Error('没有解析出可用的 TCP OpenVPN 节点');
+	免费家宽节点缓存 = nodes;
+	免费家宽节点缓存到期时间 = now + 免费家宽缓存时长;
+	return nodes;
+}
+
+function 获取免费家宽前置主机(config_JSON, requestHost) {
+	const hosts = [requestHost, ...(Array.isArray(config_JSON.HOSTS) ? config_JSON.HOSTS : [])]
+		.map(host => String(host || '').trim().toLowerCase())
+		.filter(host => 是有效免费家宽主机(host));
+	const uniqueHosts = [...new Set(hosts)].slice(0, 免费家宽最大前置数);
+	if (!uniqueHosts.length) throw new Error('没有可用的 CF 前置域名');
+	const uuid = String(config_JSON.UUID || '').trim();
+	if (!uuid) throw new Error('当前配置缺少 UUID');
+	const basePath = String(config_JSON.完整节点路径 || config_JSON.PATH || '/').trim() || '/';
+	const path = config_JSON.随机路径 ? 随机路径(basePath) : basePath;
+	const echEnabled = config_JSON.ECH === true;
+	const echSNI = String(config_JSON.ECHConfig?.SNI || '').trim();
+	return uniqueHosts.map((host, index) => ({
+		name: `⚡ CF前置-${String(index + 1).padStart(2, '0')}`,
+		host,
+		uuid,
+		path,
+		echEnabled,
+		echSNI,
+		skipCertVerify: config_JSON.跳过证书验证 === true,
+	}));
+}
+
+function 追加免费家宽证书(lines, field, value, anchors) {
+	if (!value) return;
+	const key = `${field}:${value}`;
+	if (anchors.has(key)) {
+		lines.push(`    ${field}: *${anchors.get(key)}`);
+		return;
+	}
+	const anchor = `forkedgetunnel${field}${anchors.size + 1}`;
+	anchors.set(key, anchor);
+	lines.push(`    ${field}: &${anchor} |-`);
+	for (const pemLine of value.split('\n')) lines.push(`      ${pemLine}`);
+}
+
+function 生成免费家宽前置YAML(lines, frontNode) {
+	lines.push(
+		`  - name: ${免费家宽YAML值(frontNode.name)}`,
+		'    type: vless',
+		`    server: ${免费家宽YAML值(frontNode.host)}`,
+		'    port: 443',
+		`    uuid: ${免费家宽YAML值(frontNode.uuid)}`,
+		'    udp: false',
+		'    tls: true',
+		`    servername: ${免费家宽YAML值(frontNode.host)}`,
+		'    client-fingerprint: chrome',
+		'    network: ws',
+		'    ws-opts:',
+		`      path: ${免费家宽YAML值(frontNode.path)}`,
+		'      headers:',
+		`        Host: ${免费家宽YAML值(frontNode.host)}`,
+		`    skip-cert-verify: ${frontNode.skipCertVerify ? 'true' : 'false'}`
+	);
+	if (frontNode.echEnabled) {
+		lines.push('    ech-opts:', '      enable: true');
+		if (frontNode.echSNI) lines.push(`      query-server-name: ${免费家宽YAML值(frontNode.echSNI)}`);
+	}
+}
+
+async function 生成免费家宽订阅(config_JSON, requestHost) {
+	const frontNodes = 获取免费家宽前置主机(config_JSON, requestHost);
+	const nodes = await 获取免费家宽节点();
+	const 前置组名 = '⚡ CF前置';
+	const 家宽自动组名 = '🏠 家宽自动';
+	const 家宽手选组名 = '🏠 家宽节点';
+	const 主选组名 = '🚀 节点选择';
+	const lines = [
+		'# forkedgetunnel 免费家宽链式订阅',
+		'# 落地节点来自 VPN Gate 志愿者共享 OpenVPN 清单，不保证稳定或住宅属性',
+		'# 仅支持 mihomo / Clash Meta 1.19.25+，当前链路只承载 TCP',
+		'mixed-port: 7890',
+		'allow-lan: false',
+		'mode: rule',
+		'log-level: info',
+		'ipv6: false',
+		'unified-delay: true',
+		'tcp-concurrent: true',
+		'dns:',
+		'  enable: true',
+		'  ipv6: false',
+		'  enhanced-mode: fake-ip',
+		'  fake-ip-range: 198.18.0.1/16',
+		'  nameserver:',
+		'    - https://dns.alidns.com/dns-query',
+		'    - https://1.1.1.1/dns-query',
+		'',
+		'proxies:'
+	];
+	frontNodes.forEach(frontNode => 生成免费家宽前置YAML(lines, frontNode));
+	const anchors = new Map();
+	const homeNodeNames = [];
+	const nodesByCountry = [];
+	for (const [index, node] of nodes.entries()) {
+		const name = `🏠 ${node.country}-家宽-${String(index + 1).padStart(2, '0')}`;
+		homeNodeNames.push(name);
+		nodesByCountry.push({ ...node, name });
+		lines.push(
+			`  - name: ${免费家宽YAML值(name)}`,
+			'    type: openvpn',
+			`    server: ${免费家宽YAML值(node.server)}`,
+			`    port: ${node.port}`,
+			'    proto: tcp',
+			'    username: "vpn"',
+			'    password: "vpn"',
+			`    cipher: ${node.cipher}`,
+			`    auth: ${node.auth}`,
+			'    udp: false',
+			'    handshake-timeout: 30',
+			`    dialer-proxy: ${免费家宽YAML值(前置组名)}`,
+			'    remote-dns-resolve: true',
+			'    dns: [ 8.8.8.8, 1.1.1.1 ]'
+		);
+		追加免费家宽证书(lines, 'ca', node.ca, anchors);
+		追加免费家宽证书(lines, 'cert', node.cert, anchors);
+		追加免费家宽证书(lines, 'key', node.key, anchors);
+		追加免费家宽证书(lines, 'tls-auth', node.tlsAuth, anchors);
+		if (node.keyDirection) lines.push(`    key-direction: ${免费家宽YAML值(node.keyDirection)}`);
+	}
+
+	const namesList = names => names.map(name => `      - ${免费家宽YAML值(name)}`);
+	const countryNames = nodesByCountry.slice().sort((left, right) => left.country === right.country ? left.name.localeCompare(right.name) : left.country.localeCompare(right.country)).map(node => node.name);
+	lines.push('', 'proxy-groups:');
+	lines.push(`  - name: ${免费家宽YAML值(前置组名)}`, '    type: url-test', '    url: https://www.gstatic.com/generate_204', '    interval: 300', '    tolerance: 50', '    proxies:', ...namesList(frontNodes.map(node => node.name)));
+	lines.push(`  - name: ${免费家宽YAML值(家宽自动组名)}`, '    type: fallback', '    url: https://www.gstatic.com/generate_204', '    interval: 1800', '    lazy: true', '    proxies:', ...namesList(homeNodeNames));
+	lines.push(`  - name: ${免费家宽YAML值(家宽手选组名)}`, '    type: select', '    proxies:', ...namesList(countryNames));
+	lines.push(`  - name: ${免费家宽YAML值(主选组名)}`, '    type: select', '    proxies:', ...namesList([家宽自动组名, 家宽手选组名, 前置组名, 'DIRECT']));
+	lines.push('', 'rules:', '  - GEOIP,LAN,DIRECT,no-resolve', '  - GEOIP,CN,DIRECT,no-resolve', `  - MATCH,${主选组名}`);
+	return lines.join('\n') + '\n';
+}
+
 function Surge订阅配置文件热补丁(content, url, config_JSON) {
 	const 每行内容 = content.includes('\r\n') ? content.split('\r\n') : content.split('\n');
 	const 完整节点路径 = config_JSON.随机路径 ? 随机路径(config_JSON.完整节点路径) : config_JSON.完整节点路径;
@@ -5665,6 +5974,7 @@ async function 读取config_JSON(env, hostname, userID, UA = "Mozilla/5.0", 重�
 			SUBAPI: `https://SUBAPI.${特征码字典[1]}ssss.net`,
 			SUBCONFIG: `https://raw.githubusercontent.com/${特征码字典[1]}/ACL4SSR/refs/heads/main/Clash/config/ACL4SSR_Online_Mini_MultiMode_CF.ini`,
 			SUBEMOJI: false,
+			免费家宽: false, // 仅生成 Clash/Mihomo 家宽链式订阅
 			SUBLIST: false, //仅输出节点信息
 			UDP: false, // 启用 UDP
 			XUDP: false, // 启用 XUDP
@@ -5768,6 +6078,7 @@ async function 读取config_JSON(env, hostname, userID, UA = "Mozilla/5.0", 重�
 	if (!config_JSON.订阅转换配置.APPEND_TYPE) config_JSON.订阅转换配置.APPEND_TYPE = false;
 	if (!config_JSON.订阅转换配置.SORT) config_JSON.订阅转换配置.SORT = false;
 	if (typeof config_JSON.订阅转换配置.EXPAND !== 'boolean') config_JSON.订阅转换配置.EXPAND = true;
+	if (typeof config_JSON.订阅转换配置.免费家宽 !== 'boolean') config_JSON.订阅转换配置.免费家宽 = false;
 	if (!config_JSON.gRPCUserAgent) config_JSON.gRPCUserAgent = UA;
 	config_JSON.HOST = host;
 	if (!config_JSON.HOSTS) config_JSON.HOSTS = [hostname];
