@@ -14087,7 +14087,7 @@
 					</div>
 					<div class="network-warning-actions">
 						<button class="btn btn-local-warning" id="networkWarningLocalBtn" type="button">本地优选</button>
-						<button class="btn" id="networkWarningConfirmBtn" type="button">确定</button>
+						<button class="btn" id="networkWarningConfirmBtn" type="button">我知道了，继续进入</button>
 					</div>
 				</div>
 			</div>
@@ -14666,14 +14666,14 @@
 				async function ensureCnNetworkBeforeAction({ button, statusEl, idleHtml }) {
 					if (state.networkChecking) return false;
 					if (button) button.innerHTML = `${svgPulseIcon()}网络验证`;
-					if (statusEl) statusEl.textContent = "正在检测CN网络";
+					if (statusEl) statusEl.textContent = "正在检测网络";
 					const allowed = await refreshCnNetwork({ resetResults: false, stopRuns: false });
 					if (!allowed) {
 						if (button && idleHtml) button.innerHTML = idleHtml;
-						if (statusEl) statusEl.textContent = "检测未通过，请关闭代理后重试";
+						if (statusEl) statusEl.textContent = "检测服务不可访问，请检查网络后重试";
 						return false;
 					}
-					if (statusEl) statusEl.textContent = "CN网络检测通过";
+					if (statusEl) statusEl.textContent = "网络检测完成，可继续优选";
 					return true;
 				}
 
@@ -14717,7 +14717,7 @@
 							const family = index === 0 ? "ipv4" : "ipv6";
 							if (result.status === "fulfilled") {
 								state.network[family] = result.value;
-								if (result.value.allowed) {
+								if (result.value.status === "done") {
 									if (result.value.ipType === "ipv4") state.ipv4 = result.value.ip;
 									if (result.value.ipType === "ipv6") state.ipv6 = result.value.ip;
 								}
@@ -14739,7 +14739,12 @@
 						if (bootLoading.active) {
 							await finishBootLoading();
 						}
-						if (!allowed) showNetworkWarning();
+						const warningKey = ["ipv4", "ipv6"].map(family => {
+							const info = state.network[family];
+							return info && info.status === "done" && !info.allowed ? family + ":" + info.country : "";
+						}).filter(Boolean).join("|");
+						if (!allowed || (warningKey && warningKey !== state.networkWarningKey)) showNetworkWarning();
+						state.networkWarningKey = warningKey;
 						return allowed;
 					} catch (error) {
 						if (bootLoading.active) await finishBootLoading();
@@ -14769,7 +14774,7 @@
 						kind: "non-cn",
 						heading: "红牌警告",
 						title: "检测到当前网络出口不是 CN 直连",
-						message: "请确认浏览器当前网络是否经过了 代理、VPN 或 境外网络，\n在线优选仅有 CN 直连网络环境才可以实现！\n当前网络环境无法进行在线优选，可尝试使用「本地优选」。",
+						message: "当前出口可能经过代理、VPN 或境外网络，仍可继续在线优选。\nHTTPS 初筛和下载测速反映的是当前出口路径，不代表中国直连或本地 Clash 的实际效果。\n建议关闭代理后比较结果，或使用「本地 Clash 实测」验证真实代理连接。",
 						rows: nonCn,
 						details: completed
 					};
@@ -14833,23 +14838,9 @@
 				}
 
 				function confirmNetworkWarning() {
-					if (window.parent && window.parent !== window) {
-						try {
-							window.parent.location.reload();
-							return;
-						} catch (error) {
-							// Fall back to postMessage below when direct parent access is unavailable.
-						}
-
-						try {
-							window.parent.postMessage({ type: "bestcf-force-reload" }, "*");
-							return;
-						} catch (error) {
-							// Ignore and reload the current document as a last resort.
-						}
-					}
-
-					window.location.reload();
+					els.networkWarningOverlay.classList.remove("is-visible");
+					updateActionAvailability();
+					if (!els.latencyBtn.disabled) els.latencyBtn.focus();
 				}
 
 				function openLocalOptimizeFromWarning() {
@@ -14941,10 +14932,10 @@
 					}
 
 					if (!info.allowed) {
-						card.classList.add("is-hidden");
+						card.classList.remove("is-hidden");
 						card.classList.add("is-unavailable");
-						value.textContent = "不可用";
-						if (note) note.textContent = "非CN网络";
+						value.textContent = maskIpForDisplay(info.ip, info.ipType || family);
+						if (note) note.textContent = "非CN出口 · 可继续优选，结果仅供当前网络参考";
 						tag.className = "tag bad";
 						tag.textContent = info.country || "非CN";
 						return;
