@@ -32,6 +32,18 @@ GNU General Public License, version 2.
 
 ## 在线优选批量测速
 
+### 2026-10-02：本地 Clash 实测
+
+- 已检查现有功能：原延迟是 OPTIONS 预探测后请求优选服务的 ip.json，不验证本项目代理。新增入口复用 mihomo 的 GET /proxies、GET /proxies/{name}/delay 和已有 runPool，无新依赖。原按钮、表头、CSV 改称「HTTPS 初筛」，下载速度来源不变。
+- 使用流程：保存候选节点，在 Bettbox 导入/更新并启用订阅，在「本地 Clash 实测」读取节点，按名称筛选，再一键实测。只测独立节点，排除策略组、DIRECT/REJECT 等；不按名称猜测 IP、不覆盖初筛结果/ADD.txt、不切换当前节点、不修改客户端配置。
+- 数值直接取内核 delay，不是网页 API 耗时。默认测试网址 https://www.gstatic.com/generate_204、超时 5000ms、并发 4（1～10）。测试网址和超时应与客户端一致；内核版本、统一延迟、连接复用、负载仍影响数值。不受原 HTTPS 初筛的中国直连检查限制。
+- 接口只允许本机 127.0.0.1/localhost/[::1] HTTP/HTTPS 根地址，拒绝 URL 凭据、路径/查询参数及外部地址。secret 仅在页面内存中使用，以 Authorization 发往本机，不保存、不上传 Worker；请求只用 GET、不携带 cookie、不允许重定向。关闭在线优选或离开页面会停止前端任务、清空密钥并清除连接状态。
+- 页面说明动态提供当前管理页面 origin 的 CORS 配置（不用通配来源）；需要用户在 Bettbox 本地覆写中配置 external-controller、secret、external-controller-cors，并允许浏览器本地网络访问。若 HTTP 被拦截，可配置可信证书的本地 HTTPS 接口，不能关闭浏览器防护或暴露公网。订阅更新可能覆盖控制设置，因此不要依赖直接编辑远程订阅。
+- 节点上限 1000，测试中锁定设置；每次完成只更新对应单元格，结束后排序，避免重复重建整表。超时/失败保留。停止中断浏览器请求，已派发的内核测试最多持续到所设超时。
+- 新日志 dial tcp 104.19.52.52:443: i/o timeout 属于该次 TCP 建连失败，不应据此修改 ECH/PROXYIP；单独的 connect error: context deadline exceeded 不能精确区分 TCP 和后续握手。
+- 离线验证：2 个内联脚本编译，覆盖本机地址限制、组过滤、特殊名称编码、内核数值/排序、GET/重定向限制、错误/无效 delay、筛选、停止/并发、密钥及连接状态清理。真实浏览器 CORS/本机权限、Bettbox 配置及拨号仍由用户验收。
+- 官方依据：https://github.com/MetaCubeX/mihomo/blob/Meta/hub/route/proxies.go 、https://wiki.metacubex.one/config/general/ 。
+
 ### 2026-10-02：在线有速度但 Clash 超时
 
 - 在线优选通过 `buildProbeUrl` 请求优选服务域名的 `__down` 端点。它验证该服务的 HTTPS 下载能力，不验证本项目 Worker 的 SNI、WebSocket/gRPC、UUID 或后续代理出口；下载速度不能作为 Clash 可用性的保证。

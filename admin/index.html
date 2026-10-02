@@ -1,7 +1,7 @@
 <!--
   forkedgetunnel - modified version of the upstream edgetunnel project.
   Upstream source: https://github.com/cmliu/edgetunnel
-  Fork modifications and additions by Chengeeker, 2026-09-30.
+  Fork modifications and additions by Chengeeker, 2026-09-30 and 2026-10-02.
   Distributed under the GNU General Public License, version 2;
   see ../LICENSE for the complete license text.
 -->
@@ -13874,7 +13874,7 @@
 										<svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
 											<path d="M5 12h4l3-7 3 14 3-7h1"></path>
 										</svg>
-										优选延迟
+										HTTPS 初筛
 									</button>
 								</div>
 
@@ -13962,9 +13962,39 @@
 							</div>
 						</section>
 
+						<section class="panel" aria-labelledby="clashTitle">
+							<div class="panel-head"><h2 class="panel-title" id="clashTitle">本地 Clash 实测</h2></div>
+							<div class="panel-body">
+								<p class="tiny muted">先将候选节点保存并导入 Bettbox，再读取本地节点。这里由本地内核测试完整代理连接，不切换当前节点，不替换下方 HTTPS 初筛结果。</p>
+								<div class="form-grid compact">
+									<div class="field"><label for="clashController">控制接口（不是代理端口）</label><input class="input" id="clashController" value="http://127.0.0.1:9090" spellcheck="false"></div>
+									<div class="field"><label for="clashSecret">控制接口密钥（secret）</label><input class="input" id="clashSecret" type="password" autocomplete="off" placeholder="与客户端配置一致；仅本次页面使用"></div>
+									<div class="field"><label for="clashTestUrl">测试网址（与客户端保持一致）</label><input class="input" id="clashTestUrl" value="https://www.gstatic.com/generate_204" spellcheck="false"></div>
+									<div class="field"><label for="clashTimeout">超时（毫秒）</label><input class="input" id="clashTimeout" type="number" min="1000" max="30000" value="5000"></div>
+									<div class="field"><label for="clashThreads">实测并发</label><input class="input" id="clashThreads" type="number" min="1" max="10" value="4"></div>
+									<div class="field"><label for="clashFilter">节点名称筛选</label><input class="input" id="clashFilter" placeholder="可输入 HK、电信优选等关键词"></div>
+								</div>
+								<div class="control-row">
+									<button class="btn secondary" id="clashLoadBtn" type="button">读取本地节点</button>
+									<button class="btn" id="clashTestBtn" type="button" disabled>一键实测</button>
+									<span class="tiny muted" id="clashStatus" role="status">尚未连接本地内核</span>
+								</div>
+								<details class="settings-block advanced-settings">
+									<summary class="advanced-settings-summary"><span class="advanced-settings-copy"><span class="advanced-settings-title">首次连接怎么配置？</span><span class="advanced-settings-meta">仅访问本机 · 密钥不保存、不上传</span></span><span class="advanced-settings-chevron" aria-hidden="true">⌄</span></summary>
+									<div class="advanced-settings-body tiny">
+										<p>在 Bettbox 的本地配置覆写中启用控制接口，并设置下面的 CORS 配置（不要直接修改会被更新覆盖的订阅）。密钥替换为你自己设置的值，再在上方填入相同密钥。</p>
+										<pre id="clashConfigHelp" style="white-space: pre-wrap; overflow-wrap: anywhere;"></pre>
+										<p>允许浏览器对本地网络的访问权限。连接失败时检查端口、密钥和 CORS；若浏览器仍拦截 HTTPS 页面访问本地 HTTP，可使用已配置可信证书的本地 HTTPS 控制接口，不要关闭浏览器安全防护或将接口暴露到公网。</p>
+										<p>只列出已导入的独立节点，不测试策略组或 DIRECT。关键词为空时测试全部列出的节点。实际毫秒数取自内核，而不是网页请求耗时；测试地址、超时、内核统一延迟设置及网络负载都会影响结果。停止后已发出的内核任务最多持续到设定超时。</p>
+									</div>
+								</details>
+							</div>
+							<div class="result-wrap"><table><thead><tr><th>本地节点名称</th><th>内核实测（ms，低到高）</th></tr></thead><tbody id="clashResultBody"><tr><td class="empty" colspan="2">请先读取本地节点</td></tr></tbody></table></div>
+						</section>
+
 						<section class="panel" aria-labelledby="resultTitle">
 							<div class="panel-head">
-								<h2 class="panel-title" id="resultTitle">优选结果</h2>
+								<h2 class="panel-title" id="resultTitle">HTTPS 初筛结果（不代表代理可用）</h2>
 								<span class="tag idle" id="resultCount">0 个可用</span>
 							</div>
 							<div class="result-wrap">
@@ -13995,7 +14025,7 @@
 														role="button" tabindex="0" data-filter-key="colo">数据中心</span>
 													<span class="sort-mark" data-sort-mark="colo"></span></button></th>
 											<th style="width: 13%"><button class="sort-header" type="button"
-													data-sort="latency">延迟(ms) <span class="sort-mark"
+													data-sort="latency">HTTPS(ms) <span class="sort-mark"
 														data-sort-mark="latency"></span></button></th>
 											<th style="width: 15%">
 												<div class="speed-header">
@@ -14264,7 +14294,175 @@
 					}
 				});
 
+				const localClash = { rows: [], run: null, session: null };
+
+				function readLocalClashSettings() {
+					const controller = new URL($("#clashController").value.trim());
+					if (!["http:", "https:"].includes(controller.protocol) ||
+						!["127.0.0.1", "localhost", "[::1]"].includes(controller.hostname) ||
+						controller.username || controller.password || controller.search || controller.hash || controller.pathname !== "/") {
+						throw new Error("控制接口只允许本机根地址，例如 http://127.0.0.1:9090");
+					}
+					const target = new URL($("#clashTestUrl").value.trim());
+					if (!["http:", "https:"].includes(target.protocol) || target.username || target.password) throw new Error("测试网址必须为不含账号密码的 HTTP/HTTPS 地址");
+					const timeout = Number($("#clashTimeout").value);
+					const threads = Number($("#clashThreads").value);
+					if (!Number.isInteger(timeout) || timeout < 1000 || timeout > 30000) throw new Error("超时范围为 1000～30000 毫秒");
+					if (!Number.isInteger(threads) || threads < 1 || threads > 10) throw new Error("实测并发范围为 1～10");
+					return { base: controller.origin, secret: $("#clashSecret").value, target: target.href, timeout, threads };
+				}
+
+				async function requestLocalClash(settings, path, run, timeout = 5000) {
+					const controller = new AbortController();
+					run.controllers.add(controller);
+					const timer = setTimeout(() => controller.abort(), timeout);
+					try {
+						const response = await fetch(settings.base + path, {
+							method: "GET", signal: controller.signal, cache: "no-store", credentials: "omit", redirect: "error",
+							headers: settings.secret ? { Authorization: "Bearer " + settings.secret } : {}
+						});
+						if (response.status === 401 || response.status === 403) throw new Error("控制接口鉴权失败，请检查 secret");
+						if (response.status === 504) throw new Error("超时");
+						if (response.status === 503) throw new Error("节点测试失败");
+						if (response.status === 404) throw new Error("节点不存在或内核接口不兼容，请重新读取");
+						if (!response.ok) throw new Error("控制接口 HTTP " + response.status);
+						return await response.json();
+					} catch (error) {
+						if (error.name === "AbortError") throw new Error(run.stopped ? "已停止" : "接口响应超时");
+						if (error instanceof TypeError) throw new Error("无法访问本地接口：检查端口、CORS 及浏览器本地网络权限");
+						throw error;
+					} finally {
+						clearTimeout(timer);
+						run.controllers.delete(controller);
+					}
+				}
+
+				function localClashNodes(proxies) {
+					if (!proxies || typeof proxies !== "object" || Array.isArray(proxies)) throw new Error("控制接口未返回有效节点列表");
+					return Object.entries(proxies).filter(([name, proxy]) => proxy && typeof proxy === "object" &&
+						!Array.isArray(proxy.all) && !["DIRECT", "REJECT", "REJECT-DROP", "PASS", "COMPATIBLE", "DNS", "GLOBAL"].includes(name.toUpperCase()) &&
+						! /^(direct|reject|rejectdrop|pass|compatible|dns|selector|urltest|fallback|loadbalance|relay)$/i.test(String(proxy.type).replace(/[\s_-]/g, "")))
+						.map(([name]) => ({ name, delay: null, status: "未测试" }));
+				}
+
+				function visibleLocalClashRows() {
+					const keyword = $("#clashFilter").value.trim().toLowerCase();
+					return localClash.rows.filter(row => row.name.toLowerCase().includes(keyword));
+				}
+
+				function renderLocalClashRows() {
+					const body = $("#clashResultBody");
+					body.replaceChildren();
+					const rows = visibleLocalClashRows().slice().sort((a, b) => (a.delay ?? Infinity) - (b.delay ?? Infinity));
+					if (!rows.length) {
+						const cell = body.insertRow().insertCell();
+						cell.colSpan = 2; cell.className = "empty"; cell.textContent = "没有匹配的已导入节点";
+					}
+					for (const row of rows) {
+						const tr = body.insertRow();
+						tr.insertCell().textContent = row.name;
+						row.cell = tr.insertCell();
+						row.cell.textContent = row.delay === null ? row.status : String(row.delay);
+					}
+					$("#clashTestBtn").disabled = !localClash.run && (!localClash.session || !rows.length);
+				}
+
+				function lockLocalClashControls(locked) {
+					["clashController", "clashSecret", "clashTestUrl", "clashTimeout", "clashThreads", "clashFilter", "clashLoadBtn"].forEach(id => { $("#" + id).disabled = locked; });
+					$("#clashTestBtn").textContent = locked ? "停止实测" : "一键实测";
+				}
+
+				async function loadLocalClashNodes() {
+					if (localClash.run) return;
+					const run = { stopped: false, controllers: new Set() };
+					localClash.run = run;
+					localClash.session = null;
+					localClash.rows = [];
+					lockLocalClashControls(true);
+					$("#clashTestBtn").disabled = true;
+					$("#clashStatus").textContent = "正在读取本地节点…";
+					try {
+						const settings = readLocalClashSettings();
+						const data = await requestLocalClash(settings, "/proxies", run);
+						if (run.stopped) throw new Error("已停止读取");
+						const rows = localClashNodes(data.proxies);
+						if (rows.length > 1000) throw new Error("节点超过 1000 个，请先在客户端加载较小的候选订阅");
+						localClash.rows = rows;
+						localClash.session = { base: settings.base };
+						$("#clashStatus").textContent = "已读取 " + rows.length + " 个独立节点（可按名称筛选）";
+					} catch (error) {
+						$("#clashStatus").textContent = error.message;
+					} finally {
+						localClash.run = null;
+						lockLocalClashControls(false);
+						renderLocalClashRows();
+					}
+				}
+
+				async function testLocalClashNodes() {
+					if (localClash.run) {
+						localClash.run.stopped = true;
+						for (const controller of localClash.run.controllers) controller.abort();
+						return;
+					}
+					let settings;
+					try { settings = readLocalClashSettings(); } catch (error) { $("#clashStatus").textContent = error.message; return; }
+					if (!localClash.session || localClash.session.base !== settings.base) { $("#clashStatus").textContent = "请先读取本地节点"; return; }
+					const rows = visibleLocalClashRows();
+					if (!rows.length) return;
+					const run = { stopped: false, controllers: new Set() };
+					localClash.run = run;
+					lockLocalClashControls(true);
+					for (const row of rows) { row.delay = null; row.status = "等待实测"; }
+					renderLocalClashRows();
+					let completed = 0;
+					$("#clashStatus").textContent = "正在实测 0 / " + rows.length;
+					try {
+						await runPool(rows, settings.threads, async row => {
+							row.status = "实测中"; row.cell.textContent = row.status;
+							try {
+								const query = new URLSearchParams({ url: settings.target, timeout: String(settings.timeout) });
+								const data = await requestLocalClash(settings, "/proxies/" + encodeURIComponent(row.name) + "/delay?" + query, run, settings.timeout + 2000);
+								if (!Number.isFinite(data.delay) || data.delay <= 0) throw new Error("内核未返回有效延迟");
+								if (!run.stopped) { row.delay = data.delay; row.status = "完成"; }
+							} catch (error) { row.status = error.message; }
+							finally {
+								completed += 1;
+								row.cell.textContent = row.delay === null ? row.status : String(row.delay);
+								$("#clashStatus").textContent = "正在实测 " + completed + " / " + rows.length;
+							}
+						}, run);
+					} finally {
+						for (const row of rows) { if (row.status === "等待实测" || row.status === "实测中") row.status = "已停止"; }
+						localClash.run = null;
+						lockLocalClashControls(false);
+						renderLocalClashRows();
+						const success = rows.filter(row => row.delay !== null).length;
+						$("#clashStatus").textContent = (run.stopped ? "已停止" : "实测完成") + "：成功 " + success + " / " + rows.length + "（失败结果已保留）";
+					}
+				}
+
+				function bindLocalClashEvents() {
+					$("#clashLoadBtn").addEventListener("click", loadLocalClashNodes);
+					$("#clashTestBtn").addEventListener("click", testLocalClashNodes);
+					$("#clashFilter").addEventListener("input", renderLocalClashRows);
+					["clashController", "clashSecret"].forEach(id => $("#" + id).addEventListener("input", () => {
+						localClash.session = null; localClash.rows = []; renderLocalClashRows();
+						$("#clashStatus").textContent = "连接设置已更改，请重新读取本地节点";
+					}));
+					$("#clashConfigHelp").textContent = "external-controller: 127.0.0.1:9090\nsecret: \"替换成你自己的控制密钥\"\nexternal-controller-cors:\n  allow-origins:\n    - " + JSON.stringify(window.parent.location.origin) + "\n  allow-private-network: true";
+					const closeLocalClash = () => {
+						if (localClash.run) { localClash.run.stopped = true; for (const controller of localClash.run.controllers) controller.abort(); }
+						$("#clashSecret").value = "";
+						localClash.session = null;
+						if (!localClash.run) $("#clashTestBtn").disabled = true;
+					};
+					window.addEventListener("pagehide", closeLocalClash);
+					window.addEventListener("forkedgetunnel:close", closeLocalClash);
+				}
+
 				function bindEvents() {
+					bindLocalClashEvents();
 					els.importBtn.addEventListener("click", importLibrary);
 					els.librarySelect.addEventListener("change", rememberSelectedLibrary);
 					els.ipInput.addEventListener("input", updateEditorMeta);
@@ -14285,7 +14483,7 @@
 						if (!await ensureCnNetworkBeforeAction({
 							button: els.latencyBtn,
 							statusEl: els.latencyStatus,
-							idleHtml: `${svgPulseIcon()}优选延迟`
+							idleHtml: `${svgPulseIcon()}HTTPS 初筛`
 						})) return;
 						startLatencyRun();
 					});
@@ -14929,7 +15127,7 @@
 					} catch (error) {
 						const message = friendlyError(error);
 						els.latencyStatus.textContent = message;
-						els.latencyBtn.innerHTML = `${svgPulseIcon()}优选延迟`;
+						els.latencyBtn.innerHTML = `${svgPulseIcon()}HTTPS 初筛`;
 						showOptimizeToast(message);
 						return;
 					}
@@ -14981,7 +15179,7 @@
 					}
 					state.latencyRun = null;
 					els.latencyBtn.classList.remove("danger");
-					els.latencyBtn.innerHTML = `${svgPulseIcon()}优选延迟`;
+					els.latencyBtn.innerHTML = `${svgPulseIcon()}HTTPS 初筛`;
 					updateActionAvailability();
 					renderResults();
 				}
@@ -15719,7 +15917,7 @@
 						return false;
 					}
 
-					const header = ["优选IP", "IP类型", "优选类型", "国家/地区", "数据中心", "延迟(ms)", "速度(Mbps)"];
+					const header = ["优选IP", "IP类型", "优选类型", "国家/地区", "数据中心", "HTTPS初筛(ms)", "速度(Mbps)"];
 					const csvRows = rows.map((item) => [
 						item.address || "",
 						item.ipType || "未知",
@@ -25773,6 +25971,8 @@
 		// 关闭在线优选全屏模块
 		function closeOnlineOptimizeModal(event) {
 			if (event && event.target !== event.currentTarget) return;
+			const optimizeFrame = document.getElementById('onlineOptimizeFrame');
+			if (optimizeFrame && optimizeFrame.dataset.loaded) optimizeFrame.contentWindow.dispatchEvent(new Event('forkedgetunnel:close'));
 			const modal = document.getElementById('onlineOptimizeModal');
 			if (modal) modal.classList.remove('show');
 
