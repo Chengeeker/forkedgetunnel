@@ -32,6 +32,13 @@ GNU General Public License, version 2.
 
 ## 在线优选批量测速
 
+### 2026-10-02：在线有速度但 Clash 超时
+
+- 在线优选通过 `buildProbeUrl` 请求优选服务域名的 `__down` 端点。它验证该服务的 HTTPS 下载能力，不验证本项目 Worker 的 SNI、WebSocket/gRPC、UUID 或后续代理出口；下载速度不能作为 Clash 可用性的保证。
+- 现有 `Clash订阅配置文件热补丁` 可复用，无需新库。修复其中 UUID/password 带 YAML 引号或行尾注释时无法匹配本项目节点的问题，使这些节点也能补齐 ECH；已有 `ech-opts` 不再重复添加，保留订阅转换器已有配置。
+- 用户反馈来自 Bettbox 普通订阅，其提供的节点已存在 ECH 配置且 UUID 未加引号，因此上述兼容性修复不能当作这条节点超时的根因。需要客户端日志定位 TCP、TLS/ECH、WS 握手或出口失败阶段。
+- 本次保留默认 ECH 配置，未进行真实代理拨号或中国直连环境验收，实际网络测试由用户执行。不得保存用户提供的节点认证值或完整订阅。
+
 - `edgetunnel` 的 `_worker.js` 负责 Worker 后端，管理面板原本位于独立的 `EDT-Pages/EDT-Pages.github.io` 仓库。
 - 在线优选前端原本已经包含单条测速、批量测速 `startAllSpeedTests`、并发池和停止测速逻辑，缺陷是 `onlineOptimizeTemplate` 的速度列没有渲染 `#speedAllBtn` 控件，因此批量逻辑没有入口。
 - 面板 fork `Chengeeker/EDT-Pages.github.io` 已在 `ce389dd` 增加“一键测速”按钮。本仓库当前已将该版本的 `admin/index.html`、登录页、无配置提示页和登录页所需的 `cdn-cgi/trace` 静态资源纳入根目录，后续 Pages 部署直接使用这些文件。

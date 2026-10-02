@@ -2,7 +2,7 @@
 /*
  * forkedgetunnel - modified version of the upstream edgetunnel project.
  * Upstream source: https://github.com/cmliu/edgetunnel
- * Fork modifications and additions by Chengeeker, 2026-09-30.
+ * Fork modifications and additions by Chengeeker, 2026-09-30 and 2026-10-02.
  *
  * This file is distributed under the GNU General Public License, version 2.
  * See the LICENSE file in the repository for the complete license text.
@@ -4924,7 +4924,10 @@ function Clash订阅配置文件热补丁(Clash_原始订阅内容, config_JSON 
 	const 获取凭据值 = (nodeText, isFlowStyle) => {
 		const credentialField = 获取代理类型(nodeText) === 'trojan' ? 'password' : 'uuid';
 		const pattern = new RegExp(`${credentialField}:\\s*${isFlowStyle ? '([^,}\\n]+)' : '([^\\n]+)'}`);
-		return nodeText.match(pattern)?.[1]?.trim() || null;
+		const raw = nodeText.match(pattern)?.[1]?.trim();
+		if (!raw) return null;
+		const value = raw.replace(/\s+#.*$/, '').trim();
+		return value.replace(/^(["'])([\s\S]*)\1$/, '$2');
 	};
 	const 插入NameserverPolicy = (yaml, hostsEntries) => {
 		if (/^\s{2}nameserver-policy:\s*(?:\n|$)/m.test(yaml)) {
@@ -5005,6 +5008,7 @@ function Clash订阅配置文件热补丁(Clash_原始订阅内容, config_JSON 
 		return nodeLines;
 	};
 	const 添加Block格式ECHOpts = (nodeLines, topLevelIndent) => {
+		if (nodeLines.some(line => /^\s*ech-opts\s*:/.test(line))) return nodeLines;
 		let insertIndex = -1;
 		for (let j = nodeLines.length - 1; j >= 0; j--) {
 			if (nodeLines[j].trim()) {
@@ -5047,7 +5051,7 @@ function Clash订阅配置文件热补丁(Clash_原始订阅内容, config_JSON 
 				braceCount += (lines[i].match(/\{/g) || []).length - (lines[i].match(/\}/g) || []).length;
 			}
 			if (需要处理gRPC) fullNode = 添加Flow格式gRPCUserAgent(fullNode);
-			if (需要处理ECH && 获取凭据值(fullNode, true) === uuid.trim()) {
+			if (需要处理ECH && 获取凭据值(fullNode, true) === uuid.trim() && !/\bech-opts\s*:/.test(fullNode)) {
 				fullNode = fullNode.replace(/\}(\s*)$/, `, ech-opts: {enable: true${ECH_SNI ? `, query-server-name: ${ECH_SNI}` : ''}}}$1`);
 			}
 			processedLines.push(fullNode);
