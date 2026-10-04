@@ -13965,7 +13965,7 @@
 						<section class="panel" aria-labelledby="clashTitle">
 							<div class="panel-head"><h2 class="panel-title" id="clashTitle">本地 Clash 实测</h2></div>
 							<div class="panel-body">
-								<p class="tiny muted">先将候选节点保存并导入 Bettbox，再读取本地节点。这里由本地内核测试完整代理连接，不切换当前节点，不替换下方 HTTPS 初筛结果。</p>
+								<p class="tiny muted">先将候选节点保存并导入支持 Mihomo 控制接口的 Clash 客户端，再读取本地节点。这里由本地内核测试完整代理连接，不切换当前节点，不替换下方 HTTPS 初筛结果。</p>
 								<div class="form-grid compact">
 									<div class="field"><label for="clashController">控制接口（不是代理端口）</label><input class="input" id="clashController" value="http://127.0.0.1:9090" spellcheck="false"></div>
 									<div class="field"><label for="clashSecret">控制接口密钥（secret）</label><input class="input" id="clashSecret" type="password" autocomplete="off" placeholder="与客户端配置一致；仅本次页面使用"></div>
@@ -13982,7 +13982,7 @@
 								<details class="settings-block advanced-settings">
 									<summary class="advanced-settings-summary"><span class="advanced-settings-copy"><span class="advanced-settings-title">首次连接怎么配置？</span><span class="advanced-settings-meta">仅访问本机 · 密钥不保存、不上传</span></span><span class="advanced-settings-chevron" aria-hidden="true">⌄</span></summary>
 									<div class="advanced-settings-body tiny">
-										<p>在 Bettbox 的本地配置覆写中启用控制接口，并设置下面的 CORS 配置（不要直接修改会被更新覆盖的订阅）。密钥替换为你自己设置的值，再在上方填入相同密钥。</p>
+										<p>在 Clash 客户端的本地配置覆写中启用 Mihomo 控制接口，并设置下面的 CORS 配置（不要直接修改会被更新覆盖的订阅）。密钥替换为你自己设置的值，再在上方填入相同密钥。</p>
 										<pre id="clashConfigHelp" style="white-space: pre-wrap; overflow-wrap: anywhere;"></pre>
 										<p>允许浏览器对本地网络的访问权限。连接失败时检查端口、密钥和 CORS；若浏览器仍拦截 HTTPS 页面访问本地 HTTP，可使用已配置可信证书的本地 HTTPS 控制接口，不要关闭浏览器安全防护或将接口暴露到公网。</p>
 										<p>只列出已导入的独立节点，不测试策略组或 DIRECT。关键词为空时测试全部列出的节点。实际毫秒数取自内核，而不是网页请求耗时；测试地址、超时、内核统一延迟设置及网络负载都会影响结果。停止后已发出的内核任务最多持续到设定超时。</p>
@@ -13995,18 +13995,18 @@
 						<section class="panel" aria-labelledby="appProxyTitle">
 							<div class="panel-head"><h2 class="panel-title" id="appProxyTitle">应用专用代理端口</h2></div>
 							<div class="panel-body">
-								<p class="tiny muted">Bettbox 内核必须运行。专用端口直接绑定独立节点，不跟随日常策略组。配置生成在本页完成，不上传、不自动修改客户端。</p>
-								<div class="field"><label for="appProxyMappings">每行一个：本地端口=客户端中的完整节点名称</label><textarea class="input" id="appProxyMappings" rows="3" spellcheck="false" placeholder="7893=从 Bettbox 复制指定节点的完整名称&#10;7894=另一个节点的完整名称"></textarea></div>
+								<p class="tiny muted">支持 Mihomo listeners 本地覆写的 Clash 客户端内核必须运行。专用端口直接绑定独立节点，不跟随日常策略组。配置生成在本页完成，不上传、不自动修改客户端。</p>
+								<div class="field"><label for="appProxyMappings">每行一个：本地端口=客户端中的完整节点名称</label><textarea class="input" id="appProxyMappings" rows="3" spellcheck="false" placeholder="7893=从 Clash 客户端复制指定节点的完整名称&#10;7894=另一个节点的完整名称"></textarea></div>
 								<div class="control-row"><button class="btn" id="appProxyGenerateBtn" type="button">生成专用端口配置</button><button class="btn secondary" id="appProxyDownloadBtn" type="button" disabled>下载 YAML 片段</button><span class="tiny muted" id="appProxyStatus" role="status">生成后添加到客户端本地覆写</span></div>
 								<div class="field"><label for="appProxyYaml">本地覆写片段（不是完整订阅，可全选复制）</label><textarea class="input" id="appProxyYaml" rows="10" readonly spellcheck="false"></textarea></div>
 								<pre class="tiny" id="appProxyAddresses" style="white-space: pre-wrap; overflow-wrap: anywhere;"></pre>
 								<details class="settings-block advanced-settings">
 									<summary class="advanced-settings-summary"><span class="advanced-settings-copy"><span class="advanced-settings-title">如何应用和验证？</span><span class="advanced-settings-meta">只监听本机 · HTTP / SOCKS5 共用端口</span></span><span class="advanced-settings-chevron" aria-hidden="true">⌄</span></summary>
 									<div class="advanced-settings-body tiny">
-										<p>1. 从 Bettbox 复制完整的独立节点名称，不能填订阅 URL，也不要绑定「节点选择」等日常策略组。可先用上方本地实测验证节点。</p>
-										<p>2. 将生成的 listeners 添加到 Bettbox 支持的本地 YAML 覆写中并重新加载；若已有 listeners，把条目合并到同一个列表，不要重复顶层键或替换其他监听器。若客户端没有支持 listeners 的覆写入口，请提供设置截图，不要拿此片段替换整个订阅。</p>
+										<p>1. 从 Clash 客户端复制完整的独立节点名称，不能填订阅 URL，也不要绑定「节点选择」等日常策略组。可先用上方本地实测验证节点。</p>
+										<p>2. 将生成的 listeners 添加到支持 Mihomo listeners 的 Clash 客户端本地 YAML 覆写中并重新加载；若已有 listeners，把条目合并到同一个列表，不要重复顶层键或替换其他监听器。若客户端没有支持 listeners 的覆写入口，请提供设置截图，不要拿此片段替换整个订阅。</p>
 										<p>3. 目标软件选择 HTTP 或 SOCKS5，地址填 127.0.0.1，端口填你设置的值，无用户名密码。HTTP 代理可转发 HTTPS 网站，但本片段不提供 https:// 加密代理接口。默认关闭 UDP。</p>
-										<p>4. 保持 Bettbox 内核运行；若不想接管其他软件，可按需关闭系统代理和 TUN。检查专用端口是否已监听，再在目标软件确认实际出口地区。切换日常节点后再次确认专用出口不变。</p>
+										<p>4. 保持 Clash 客户端内核运行；若不想接管其他软件，可按需关闭系统代理和 TUN。检查专用端口是否已监听，再在目标软件确认实际出口地区。切换日常节点后再次确认专用出口不变。</p>
 										<p>注意：网页无法确认端口是否被其他程序占用；请使用与日常代理/控制接口不同的空闲端口。订阅更新改变节点名后需要同步修改绑定。优选节点的 HK/JP/US 标签可能只是前置数据中心，不保证最终出口地区。生成器不增加跨地区故障回退；节点不可用时需手动更换。</p>
 									</div>
 								</details>
