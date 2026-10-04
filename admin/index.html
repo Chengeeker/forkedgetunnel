@@ -1,7 +1,7 @@
 <!--
   forkedgetunnel - modified version of the upstream edgetunnel project.
   Upstream source: https://github.com/cmliu/edgetunnel
-  Fork modifications and additions by Chengeeker, 2026-09-30 and 2026-10-02.
+  Fork modifications and additions by Chengeeker, 2026-09-30, 2026-10-02 and 2026-10-04.
   Distributed under the GNU General Public License, version 2;
   see ../LICENSE for the complete license text.
 -->
@@ -13992,6 +13992,27 @@
 							<div class="result-wrap"><table><thead><tr><th>本地节点名称</th><th>内核实测（ms，低到高）</th></tr></thead><tbody id="clashResultBody"><tr><td class="empty" colspan="2">请先读取本地节点</td></tr></tbody></table></div>
 						</section>
 
+						<section class="panel" aria-labelledby="appProxyTitle">
+							<div class="panel-head"><h2 class="panel-title" id="appProxyTitle">应用专用代理端口</h2></div>
+							<div class="panel-body">
+								<p class="tiny muted">Bettbox 内核必须运行。专用端口直接绑定独立节点，不跟随日常策略组。配置生成在本页完成，不上传、不自动修改客户端。</p>
+								<div class="field"><label for="appProxyMappings">每行一个：本地端口=客户端中的完整节点名称</label><textarea class="input" id="appProxyMappings" rows="3" spellcheck="false" placeholder="7893=从 Bettbox 复制指定节点的完整名称&#10;7894=另一个节点的完整名称"></textarea></div>
+								<div class="control-row"><button class="btn" id="appProxyGenerateBtn" type="button">生成专用端口配置</button><button class="btn secondary" id="appProxyDownloadBtn" type="button" disabled>下载 YAML 片段</button><span class="tiny muted" id="appProxyStatus" role="status">生成后添加到客户端本地覆写</span></div>
+								<div class="field"><label for="appProxyYaml">本地覆写片段（不是完整订阅，可全选复制）</label><textarea class="input" id="appProxyYaml" rows="10" readonly spellcheck="false"></textarea></div>
+								<pre class="tiny" id="appProxyAddresses" style="white-space: pre-wrap; overflow-wrap: anywhere;"></pre>
+								<details class="settings-block advanced-settings">
+									<summary class="advanced-settings-summary"><span class="advanced-settings-copy"><span class="advanced-settings-title">如何应用和验证？</span><span class="advanced-settings-meta">只监听本机 · HTTP / SOCKS5 共用端口</span></span><span class="advanced-settings-chevron" aria-hidden="true">⌄</span></summary>
+									<div class="advanced-settings-body tiny">
+										<p>1. 从 Bettbox 复制完整的独立节点名称，不能填订阅 URL，也不要绑定「节点选择」等日常策略组。可先用上方本地实测验证节点。</p>
+										<p>2. 将生成的 listeners 添加到 Bettbox 支持的本地 YAML 覆写中并重新加载；若已有 listeners，把条目合并到同一个列表，不要重复顶层键或替换其他监听器。若客户端没有支持 listeners 的覆写入口，请提供设置截图，不要拿此片段替换整个订阅。</p>
+										<p>3. 目标软件选择 HTTP 或 SOCKS5，地址填 127.0.0.1，端口填你设置的值，无用户名密码。HTTP 代理可转发 HTTPS 网站，但本片段不提供 https:// 加密代理接口。默认关闭 UDP。</p>
+										<p>4. 保持 Bettbox 内核运行；若不想接管其他软件，可按需关闭系统代理和 TUN。检查专用端口是否已监听，再在目标软件确认实际出口地区。切换日常节点后再次确认专用出口不变。</p>
+										<p>注意：网页无法确认端口是否被其他程序占用；请使用与日常代理/控制接口不同的空闲端口。订阅更新改变节点名后需要同步修改绑定。优选节点的 HK/JP/US 标签可能只是前置数据中心，不保证最终出口地区。生成器不增加跨地区故障回退；节点不可用时需手动更换。</p>
+									</div>
+								</details>
+							</div>
+						</section>
+
 						<section class="panel" aria-labelledby="resultTitle">
 							<div class="panel-head">
 								<h2 class="panel-title" id="resultTitle">HTTPS 初筛结果（不代表代理可用）</h2>
@@ -14461,8 +14482,53 @@
 					window.addEventListener("forkedgetunnel:close", closeLocalClash);
 				}
 
+				function generateApplicationProxyConfig(text) {
+					const lines = String(text).split(/\r?\n/).filter(line => line.trim());
+					if (!lines.length || lines.length > 16) throw new Error("请填写 1～16 行端口与节点名称");
+					const ports = new Set();
+					const entries = lines.map((line, index) => {
+						const equal = line.indexOf("=");
+						const portText = line.slice(0, equal).trim();
+						const node = equal < 0 ? "" : line.slice(equal + 1).trim();
+						const port = Number(portText);
+						if (equal < 0 || !/^\d+$/.test(portText) || !Number.isInteger(port) || port < 1024 || port > 65535) throw new Error("第 " + (index + 1) + " 行端口须为 1024～65535 的整数");
+						if ([7890, 7891, 9090, 9443].includes(port)) throw new Error("请避开常见日常代理/控制端口 " + port + "，例如使用 7893");
+						if (ports.has(port)) throw new Error("专用端口重复：" + port);
+						if (!node || node.length > 512 || /[\u0000-\u001f\u007f]/.test(node) || /^[a-z][a-z0-9+.-]*:\/\//i.test(node) || /^(DIRECT|REJECT|REJECT-DROP|GLOBAL|PASS)$/i.test(node)) throw new Error("第 " + (index + 1) + " 行请填写独立节点的完整名称，不是链接或内置出口");
+						ports.add(port);
+						return { port, node };
+					});
+					const yaml = "# 添加到本地覆写，合并已有 listeners；不要替换完整订阅\nlisteners:\n" + entries.map(({ port, node }) =>
+						"  - name: forkedgetunnel-app-" + port + "\n    type: mixed\n    listen: 127.0.0.1\n    port: " + port + "\n    udp: false\n    users: []\n    proxy: " + JSON.stringify(node)
+					).join("\n") + "\n";
+					return { yaml, addresses: entries.map(({ port, node }) => node + "\nHTTP: http://127.0.0.1:" + port + "\nSOCKS5: socks5://127.0.0.1:" + port).join("\n\n") };
+				}
+
+				function bindApplicationProxyEvents() {
+					const reset = () => {
+						$("#appProxyYaml").value = "";
+						$("#appProxyAddresses").textContent = "";
+						$("#appProxyDownloadBtn").disabled = true;
+					};
+					$("#appProxyMappings").addEventListener("input", () => { reset(); $("#appProxyStatus").textContent = "输入已更改，请重新生成"; });
+					$("#appProxyGenerateBtn").addEventListener("click", () => {
+						reset();
+						try {
+							const result = generateApplicationProxyConfig($("#appProxyMappings").value);
+							$("#appProxyYaml").value = result.yaml;
+							$("#appProxyAddresses").textContent = result.addresses;
+							$("#appProxyDownloadBtn").disabled = false;
+							$("#appProxyStatus").textContent = "已生成片段，尚未应用到客户端；请按说明添加本地覆写";
+						} catch (error) { $("#appProxyStatus").textContent = error.message; }
+					});
+					$("#appProxyDownloadBtn").addEventListener("click", () => {
+						if ($("#appProxyYaml").value) downloadTextFile("forkedgetunnel-app-listeners.yaml", $("#appProxyYaml").value, "text/yaml;charset=utf-8");
+					});
+				}
+
 				function bindEvents() {
 					bindLocalClashEvents();
+					bindApplicationProxyEvents();
 					els.importBtn.addEventListener("click", importLibrary);
 					els.librarySelect.addEventListener("change", rememberSelectedLibrary);
 					els.ipInput.addEventListener("input", updateEditorMeta);
