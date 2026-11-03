@@ -68,7 +68,7 @@ GNU General Public License, version 2. See LICENSE for the complete text.
 
 </details>
 
-### 🛠 Pages 上传 部署方法 **最佳推荐!!!** [图文教程](https://cmliussss.com/p/edt2/)
+### 🛠 Pages 上传部署方法（手动绑定 KV） [图文教程](https://cmliussss.com/p/edt2/)
 
 <details>
 <summary><code><strong>「 Pages 上传文件部署文字教程 」</strong></code></summary>
@@ -95,20 +95,30 @@ GNU General Public License, version 2. See LICENSE for the complete text.
 
 </details>
 
-### 🛠 Pages + GitHub 部署方法
+### 🛠 Pages + GitHub 部署方法（自动准备 KV）
 
 <details>
 <summary><code><strong>「 Pages + GitHub 部署文字教程 」</strong></code></summary>
 
 1. 部署 CF Pages：
    - 在 Github 上先 Fork 本项目，并点上 Star !!!
-   - 在 CF Pages 控制台中选择 `连接到 Git` 后，选中你自己的 `forkedgetunnel` 项目，按照原项目的构建设置点击 `开始设置`。
-   - 在 `设置构建和部署`页面下方，选择 `环境变量（高级）`后并 `添加变量`：变量名称填写**ADMIN**，值则为你的管理员密码，后点击 `保存并部署`即可。
-   - 本仓库已经同时包含 `_worker.js` 和 `admin/`、`login/` 等管理页面目录，Pages 会优先使用同一仓库内的管理面板，不需要再部署 `EDT-Pages.github.io`。
+   - 在 CF Pages 控制台中选择 `连接到 Git` 后，选中你自己的 `forkedgetunnel` 仓库，进入构建设置。框架选择 `None`，构建命令填写 `node scripts/prepare-pages.cjs`，构建输出目录填写 `dist`，根目录保留仓库根目录；使用 V2 或更新的构建系统及 Node.js 20 或以上版本。
+   - 在**首次保存并部署前**添加以下环境变量；已有项目修改一次构建设置，后续推送即可自动运行：
 
-2. 绑定 KV 命名空间：
-   - 在 `设置`选项卡中选择 `绑定` > `+ 添加` > `KV 命名空间`，然后选择一个已有的命名空间或创建一个新的命名空间进行绑定。
-   - `变量名称`填写**KV**，然后点击 `保存`后重试部署即可。
+     | 变量 | 内容 |
+     | --- | --- |
+     | `ADMIN` | 管理员密码，建议加密保存 |
+     | `CLOUDFLARE_ACCOUNT_ID` | 当前 Pages 项目所在账号的 Account ID |
+     | `CLOUDFLARE_API_TOKEN` | 加密保存的 API Token，限定当前账号，包含 **Cloudflare Pages：Read** 和 **Workers KV Storage：Edit** 权限 |
+
+   - Token 必须由账号所有者预先授权；仓库代码无法自行获得创建资源的权限。不要使用或提交 Global API Key。需要预览部署时，在预览环境中也配置相应变量，脚本会自动从 Pages 的 `CF_PAGES_URL` 和构建分支确定项目及生产/预览环境。
+   - 本仓库已经包含管理面板，构建只将 `_worker.js`、`admin/`、`login/` 等运行资源复制到 `dist`；无需部署第二个面板项目。构建 Token、生成的部署配置及开发文档不进入静态资源目录。
+
+2. 自动准备 KV：
+   - 构建时优先复用当前环境已有的 `KV` 绑定；没有绑定时，查找或创建名为 `forkedgetunnel-项目名-production-KV` 或 `forkedgetunnel-项目名-preview-KV` 的命名空间，并在本次部署配置中绑定为 `KV`。无需部署后再手动绑定并重新部署。
+   - 重复构建会复用原资源，不清空数据；自动新建的生产和预览 KV 分开。已有绑定按原配置保留，包括用户已主动共享的绑定。权限错误、原绑定失效或不支持的额外资源绑定会使构建失败，不发布缺少 KV 的版本，也不自动替换旧配置。
+   - 构建只在临时检出目录生成当前账号的 `wrangler.toml`，用于 Pages 上传绑定；不要把生成文件或 Token 提交回 GitHub。已有普通变量和其他 KV 绑定保留，加密变量继续由 Pages 管理。此自动流程只适用于上述 Git 构建命令；粘贴 Worker 或上传 ZIP 仍按各自的手动步骤操作。
+   - 流程依据：[Pages Wrangler 配置](https://developers.cloudflare.com/pages/functions/wrangler-configuration/)、[Pages 构建变量](https://developers.cloudflare.com/pages/configuration/build-configuration/)。本仓库已验证模拟 API 和 Pages 本地打包，真实账号的首次资源创建、绑定及发布仍需部署验收。
 
 3. 给 Pages绑定 CNAME自定义域：[视频教程](https://www.youtube.com/watch?v=LeT4jQUh8ok&t=851s)
    - 在 Pages控制台的 `自定义域`选项卡，下方点击 `设置自定义域`。

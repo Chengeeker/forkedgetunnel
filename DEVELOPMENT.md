@@ -7,6 +7,19 @@ GNU General Public License, version 2.
 
 # 开发记录
 
+## Pages Git 构建自动准备 KV（2026-11-03）
+
+- 用户确认使用 Pages 关联 GitHub。当前需求是减少部署操作；用户反馈之前网络特征隐藏效果仍不足，但没有新的网络识别验收证据，本轮不宣称已解决识别问题，也不修改传输逻辑。
+- 新增 `scripts/prepare-pages.cjs`。Pages 构建命令设为 `node scripts/prepare-pages.cjs`，输出目录设为 `dist`，首次部署前一次性设置 `ADMIN`、`CLOUDFLARE_ACCOUNT_ID` 和加密 `CLOUDFLARE_API_TOKEN`。Token 权限为当前账号的 Cloudflare Pages 读取与 Workers KV Storage 编辑；脚本使用 Pages 提供的 `CF_PAGES_URL` 和 `CF_PAGES_BRANCH` 确定项目及环境，不需要另填项目名。
+- 先读取当前项目、生产分支和对应环境配置。已有 `KV` 必须先确认原命名空间仍可读取，保持其数据和 ID，不按新标题替换。未绑定时分页查找固定标题 `forkedgetunnel-项目名-环境-KV`，存在即复用，否则创建；并发重复名称错误会重新查找，不删除或清空任何命名空间。新生产/预览资源隔离，已有共享绑定保留原意。
+- 创建后在构建检出目录生成 Pages 专用 `wrangler.toml`（移除普通 Worker 的 `main` 等字段，保留兼容日期和 flags），将 KV ID 写入当前上传配置，使创建和绑定都发生在同一次部署前。不是只创建资源，也不在构建中调用重新部署接口。当前 Worker 部署配置文件在源码仓库中保持原样，脚本只在构建检出目录改写；本地测试必须使用隔离目录，避免误改正常 Worker 入口。
+- Wrangler Pages 配置会成为对应配置字段的来源，因此复制当前环境可读取的普通变量和所有 KV 绑定；加密变量仍由 Pages 管理，不输出其值。额外的非 KV 资源绑定会先报错，防止静默覆盖。API Token 被排除于生成的明文变量；禁止输出 API 响应正文及认证头，异常只报告状态。请求限定 Cloudflare API，禁止重定向，设置 30 秒超时。资源创建失败或数据格式不完整时停止构建，不发布半成品；若创建后构建失败，新资源留待下次按固定标题复用，不做有数据损失风险的自动删除。
+- 静态输出仅复制本应用运行所需的 `_worker.js`、`admin/`、`login/`、`noADMIN/`、`noKV/`、`cdn-cgi/`，不将构建脚本、Token、部署配置、测试、回退文件或开发文档发布为静态文件。源码未引入依赖，使用 Node.js 20+ 的标准库和 fetch；额外 API 操作仅在构建阶段，不增加代理请求开销。
+- 新增 `tests/pages-kv.test.cjs`，6 项模拟 API 测试覆盖创建、已有绑定及其他 KV 保留、分页和失败重试复用、预览隔离、并发重名、缺少授权/上下文、权限失败、失效绑定和额外绑定的保护、Token 不写入静态输出及生成配置。未接入真实 Cloudflare 账号创建资源。
+- 使用实际 `_worker.js` 与管理资源，在 `build/pages-kv-check/` 内生成模拟配置并执行 Wrangler 4.128.0 的 `pages functions build`。成功解析实际 multipart 上传包，确认 `KV` 类型为 `kv_namespace`、包含指定命名空间 ID，保留模拟 `ADMIN`，兼容日期为 `2025-11-04`，不含构建 Token；build metadata 正确指向 `dist`。这证明本地打包能携带绑定，不替代 Pages Git 线上构建/首次发布验收。
+- 一手依据：[Pages Wrangler 配置及配置来源说明](https://developers.cloudflare.com/pages/functions/wrangler-configuration/)、[Pages 构建变量](https://developers.cloudflare.com/pages/configuration/build-configuration/)、[Pages 项目 API](https://developers.cloudflare.com/api/resources/pages/subresources/projects/methods/get/)。Workers 原生省略资源 ID 的自动创建功能不能直接照搬到当前 Pages Git 流程；不能把取消注释原 Worker KV 配置当作 Pages 自动绑定已经完成。
+- 回退方式：恢复之前的 Pages 构建设置和原输出目录，保留既有 KV 绑定；若该项目已经采用文件配置，按 Pages 官方规则移除配置文件后重新部署以恢复控制台编辑。不要为回退删除 KV。推送目标继续为 `forkedgetunnel` 远端的 `Chengeeker/forkedgetunnel/main`，避免误推 `origin` 指向的另一个仓库。
+
 ## 减少未认证网络探测线索（2026-11-03）
 
 - 本轮在前一轮中文命名结果上继续修改，保留其未提交代码。变更前的 Worker、开发记录、README 和兼容性测试保存于 `build/rollback/20261103-network/`；不要把前一轮的原始英文版回退副本误当成本轮基线。
