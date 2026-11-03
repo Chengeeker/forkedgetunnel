@@ -441,9 +441,9 @@
                         <path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z" />
                     </svg>
                 </div>
-                <h1 class="page-title">未绑定 KV命名空间</h1>
+                <h1 class="page-title">尚未配置持久化存储</h1>
             </div>
-            <span class="error-sub">请绑定 变量名称 为 <strong>KV</strong> 的 KV命名空间</span>
+            <span class="error-sub">可使用名称为 <strong>KV</strong> 的原生绑定；也可在首次部署的环境变量中填写<br><strong>CLOUDFLARE_ACCOUNT_ID</strong>、加密的 <strong>CLOUDFLARE_API_TOKEN</strong><br>和固定的 <strong>KV_NAMESPACE_NAME</strong>（项目专用名称）。<br>程序会在首次使用配置时自动创建或复用存储，无须补绑后重新部署。<br>已有数据请填写 <strong>KV_NAMESPACE_ID</strong> 以使用原命名空间。</span>
             <div class="footer-hint">
                 由 <a href="https://github.com/Chengeeker/forkedgetunnel" target="_blank" rel="noopener">forkedgetunnel</a> 强力驱动
             </div>

@@ -58,6 +58,7 @@ GNU General Public License, version 2. See LICENSE for the complete text.
 2. 绑定 KV 命名空间：
    - 在 `绑定`选项卡中选择 `添加绑定 +` > `KV 命名空间` > `添加绑定`，然后选择一个已有的命名空间或创建一个新的命名空间进行绑定。
    - `变量名称`填写**KV**，然后点击 `添加绑定`即可。
+   - 也可不添加原生绑定，改为按下方环境变量表填写账号、API Token 和固定的 `KV_NAMESPACE_NAME`，由程序首次使用配置时自动准备存储。
 
 3. 给 Workers绑定 自定义域： 
    - 在 workers控制台的 `触发器`选项卡，下方点击 `添加自定义域`。
@@ -95,7 +96,7 @@ GNU General Public License, version 2. See LICENSE for the complete text.
 
 </details>
 
-### 🛠 Pages + GitHub 部署方法（自动准备 KV）
+### 🛠 Pages + GitHub 部署方法（首次填变量，无需手动绑定 KV）
 
 <details>
 <summary><code><strong>「 Pages + GitHub 部署文字教程 」</strong></code></summary>
@@ -103,22 +104,24 @@ GNU General Public License, version 2. See LICENSE for the complete text.
 1. 部署 CF Pages：
    - 在 Github 上先 Fork 本项目，并点上 Star !!!
    - 在 CF Pages 控制台中选择 `连接到 Git` 后，选中你自己的 `forkedgetunnel` 仓库，进入构建设置。框架选择 `None`，构建命令填写 `node scripts/prepare-pages.cjs`，构建输出目录填写 `dist`，根目录保留仓库根目录；使用 V2 或更新的构建系统及 Node.js 20 或以上版本。
-   - 在**首次保存并部署前**添加以下环境变量；已有项目修改一次构建设置，后续推送即可自动运行：
+   - 在**首次保存并部署前**添加以下环境变量。无需在这个页面创建绑定，也不要新增名为 `KV` 的普通文本变量：
 
      | 变量 | 内容 |
      | --- | --- |
      | `ADMIN` | 管理员密码，建议加密保存 |
      | `CLOUDFLARE_ACCOUNT_ID` | 当前 Pages 项目所在账号的 Account ID |
-     | `CLOUDFLARE_API_TOKEN` | 加密保存的 API Token，限定当前账号，包含 **Cloudflare Pages：Read** 和 **Workers KV Storage：Edit** 权限 |
+     | `CLOUDFLARE_API_TOKEN` | 加密保存的 API Token，限定当前账号，包含 **Workers KV Storage：Edit** 权限 |
+     | `KV_NAMESPACE_NAME` | 本项目固定的存储名称，例如 `forkedgetunnel-myproject-production-KV`；程序自动创建或复用该名称的命名空间 |
 
-   - Token 必须由账号所有者预先授权；仓库代码无法自行获得创建资源的权限。不要使用或提交 Global API Key。需要预览部署时，在预览环境中也配置相应变量，脚本会自动从 Pages 的 `CF_PAGES_URL` 和构建分支确定项目及生产/预览环境。
-   - 本仓库已经包含管理面板，构建只将 `_worker.js`、`admin/`、`login/` 等运行资源复制到 `dist`；无需部署第二个面板项目。构建 Token、生成的部署配置及开发文档不进入静态资源目录。
+   - Token 必须由账号所有者预先授权；仓库代码无法自行获得创建资源的权限。不要使用或提交 Global API Key。预览环境使用不同的名称，例如 `forkedgetunnel-myproject-preview-KV`，以免修改生产数据。名称不要随域名、管理员密码或部署批次改变，否则会选到另一份配置。
+   - **已有数据时优先填写 `KV_NAMESPACE_ID` 为原命名空间 ID，代替按名称新建**。上一个构建脚本已创建过资源的，也可填它的原 ID，或把 `KV_NAMESPACE_NAME` 填为它的准确名称。
+   - 本仓库已经包含管理面板，构建只复制运行资源到 `dist`，不调用管理 API、不改写 `wrangler.toml`，也不发布 Token 或开发文档。Cloudflare 控制台中填写的环境变量由平台注入运行环境。
 
-2. 自动准备 KV：
-   - 构建时优先复用当前环境已有的 `KV` 绑定；没有绑定时，查找或创建名为 `forkedgetunnel-项目名-production-KV` 或 `forkedgetunnel-项目名-preview-KV` 的命名空间，并在本次部署配置中绑定为 `KV`。无需部署后再手动绑定并重新部署。
-   - 重复构建会复用原资源，不清空数据；自动新建的生产和预览 KV 分开。已有绑定按原配置保留，包括用户已主动共享的绑定。权限错误、原绑定失效或不支持的额外资源绑定会使构建失败，不发布缺少 KV 的版本，也不自动替换旧配置。
-   - 构建只在临时检出目录生成当前账号的 `wrangler.toml`，用于 Pages 上传绑定；不要把生成文件或 Token 提交回 GitHub。已有普通变量和其他 KV 绑定保留，加密变量继续由 Pages 管理。此自动流程只适用于上述 Git 构建命令；粘贴 Worker 或上传 ZIP 仍按各自的手动步骤操作。
-   - 流程依据：[Pages Wrangler 配置](https://developers.cloudflare.com/pages/functions/wrangler-configuration/)、[Pages 构建变量](https://developers.cloudflare.com/pages/configuration/build-configuration/)。本仓库已验证模拟 API 和 Pages 本地打包，真实账号的首次资源创建、绑定及发布仍需部署验收。
+2. 首次登录后自动准备存储：
+   - 有原生 `KV` 绑定时继续使用它。没有绑定时，程序在首次通过鉴权读取后台配置或订阅时创建/复用上述存储，通过 Cloudflare KV API 读写配置；不会要求补绑后重新部署，也不声称运行时给平台新增了原生绑定。
+   - 同一个名称或 ID 会被重复部署、不同访问域名和新的运行实例复用，不清空数据。普通访客、登录页面和代理数据转发不触发存储 API。权限、网络或保存失败会明确返回 503，不冒充“保存成功”。
+   - API 方式作为缺少原生绑定时的备用路径，后台和订阅读写会比原生 KV 多一次管理 API 调用并占用 API 额度；代理数据包的转发不经过它。以后添加原生绑定时，应选择同一命名空间以保留配置。
+   - 本仓库已验证无原生绑定的完整登录、保存、重开及本地 workerd 运行，真实账号的创建权限和网络仍需首次运行确认。依据：[创建 KV 命名空间](https://developers.cloudflare.com/api/resources/kv/subresources/namespaces/methods/create/)、[KV 值读写 API](https://developers.cloudflare.com/api/resources/kv/subresources/namespaces/subresources/values/)。
 
 3. 给 Pages绑定 CNAME自定义域：[视频教程](https://www.youtube.com/watch?v=LeT4jQUh8ok&t=851s)
    - 在 Pages控制台的 `自定义域`选项卡，下方点击 `设置自定义域`。
@@ -148,6 +151,10 @@ GNU General Public License, version 2. See LICENSE for the complete text.
 | **ADMIN** | ✅ | `123456` | 后台管理面板登录密码 |
 | **KEY** | ❌ | `CMLiussss` | 快速订阅路径密钥，访问 `/CMLiussss` 即可快速获取节点 |
 | **UUID** | ❌ | `90cd4a77-141a-43c9-991b-08263cfe9c10` | 强制固定UUID，只支持**UUIDv4**标准格式 |
+| **CLOUDFLARE_ACCOUNT_ID** | 无原生 KV 时填写 | 当前账号 ID | 与 API Token 配套，供运行时配置存储使用 |
+| **CLOUDFLARE_API_TOKEN** | 无原生 KV 时填写 | 加密变量 | 当前账号的 Workers KV Storage 编辑权限，不填写 Global API Key |
+| **KV_NAMESPACE_NAME** | 与 ID 二选一 | `forkedgetunnel-myproject-production-KV` | 固定且项目专用的名称，首次读取配置时自动创建或复用；预览使用另一名称 |
+| **KV_NAMESPACE_ID** | 与名称二选一 | 已有命名空间 ID | 保留原数据时填写；优先于名称，不自动替换失效 ID |
 | **EDT_PAGES_URL** | ❌ | `https://your-pages.example.com` | 可选的外部管理面板回退地址（不要包含 `/admin`）；合并后的 Pages 部署无需填写，只有在使用普通 Worker 或想切换到外部面板时才需要 |
 | **PROXYIP** | ❌ | `proxyip.cmliussss.net` | 全局自定义反代 IP，默认值 |
 | **URL** | ❌ | `https://your-public-site.example` | 公开回退页面；留空时普通访问和无效传输请求返回相同的普通 404。可填网页 URL、`nginx` 或 `1101`；无效传输只以 GET 获取外部首页，不转发请求凭据和正文 |

@@ -1,114 +1,128 @@
-// Chengeeker, 2026-11-03. GPL-2.0; see ../LICENSE. Mock API only.
+// Chengeeker, 2026-11-03. GPL-2.0; see ../LICENSE. Mock Cloudflare API only.
 const {test} = require('node:test'), assert = require('node:assert/strict');
-const fs = require('node:fs/promises'), os = require('node:os'), path = require('node:path');
+const fs = require('node:fs/promises'), vm = require('node:vm'), crypto = require('node:crypto'), os = require('node:os'), path = require('node:path');
 const {准备Pages} = require('../scripts/prepare-pages.cjs');
-const id = 'a'.repeat(32), productionId = 'b'.repeat(32), otherId = 'c'.repeat(32);
-const env = {CLOUDFLARE_ACCOUNT_ID: 'd'.repeat(32), CLOUDFLARE_API_TOKEN: 'test-only-token', CF_PAGES_URL: 'https://1234.my-project.pages.dev', CF_PAGES_BRANCH: 'main'};
-const project = () => ({name: 'my-project', production_branch: 'main', deployment_configs: {
-  production: {compatibility_date: '2025-11-04', compatibility_flags: [], env_vars: {ADMIN: {type: 'plain_text', value: 'test-only-admin'}, PRIVATE: {type: 'secret_text', value: null}, CLOUDFLARE_API_TOKEN: {type: 'plain_text', value: 'test-only-token'}}, kv_namespaces: {}},
-  preview: {compatibility_date: '2025-11-04', env_vars: {}, kv_namespaces: {}},
-}});
-async function fixture(t) {
-  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'forkedgetunnel-pages-'));
-  t.after(async () => {
-    assert.equal(path.dirname(path.resolve(root)), path.resolve(os.tmpdir()));
-    assert(path.basename(root).startsWith('forkedgetunnel-pages-'));
-    await fs.rm(root, {recursive: true, force: true});
+const id = 'a'.repeat(32), account = 'b'.repeat(32), uuid = '12345678-1234-4123-8123-123456789abc';
+const variables = {ADMIN: 'test-admin', KEY: 'test-key', UUID: uuid, OFF_LOG: 'true', CLOUDFLARE_ACCOUNT_ID: account, CLOUDFLARE_API_TOKEN: 'test-token', KV_NAMESPACE_NAME: 'my-project-production'};
+async function app(handler) {
+  const calls = [], context = vm.createContext({
+    TextEncoder, TextDecoder, Uint8Array, ArrayBuffer, DataView, URL, URLSearchParams, Request, Response, Headers,
+    ReadableStream, WritableStream, TransformStream, AbortController, AbortSignal, atob, btoa, performance,
+    setTimeout, clearTimeout, queueMicrotask, console, WebSocket: {OPEN: 1, CLOSING: 2, CLOSED: 3},
+    crypto: {getRandomValues: value => crypto.webcrypto.getRandomValues(value), subtle: new Proxy(crypto.webcrypto.subtle, {get(target, key) {
+      if (key === 'digest') return (algorithm, data) => algorithm === 'MD5' ? Promise.resolve(Uint8Array.from(crypto.createHash('md5').update(data).digest()).buffer) : target.digest(algorithm, data);
+      return typeof target[key] === 'function' ? target[key].bind(target) : target[key];
+    }})},
+    async fetch(url, options) {
+      assert.equal(new URL(url).origin, 'https://api.cloudflare.com');
+      assert.equal(options.headers.Authorization, 'Bearer test-token'); assert.equal(options.redirect, 'manual');
+      assert(options.signal); calls.push({url, ...options}); return handler(new URL(url), options);
+    },
   });
-  await fs.writeFile(path.join(root, 'wrangler.toml'), 'main = "_worker.js"\ncompatibility_date = "2025-11-04"\n');
-  await fs.writeFile(path.join(root, '_worker.js'), 'export default {};');
-  for (const directory of ['admin', 'login', 'noADMIN', 'noKV', 'cdn-cgi', 'tests']) {
-    await fs.mkdir(path.join(root, directory)); await fs.writeFile(path.join(root, directory, 'index.html'), directory);
+  const source = await fs.readFile('_worker.js', 'utf8');
+  vm.runInContext(source.replace('export default {', 'globalThis.worker = {') + '\nglobalThis.storage = 获取配置存储;', context);
+  const env = {...variables, ASSETS: {fetch: async request => new Response(new URL(request.url).pathname)}};
+  const pending = [];
+  async function request(url, init = {}, bindings = env) {
+    const incoming = new Request(url, init); incoming.cf = {colo: 'HKG', asn: 64512, country: 'CN'};
+    return context.worker.fetch(incoming, bindings, {waitUntil(promise) { pending.push(promise); }});
   }
-  await fs.writeFile(path.join(root, '.env'), 'PRIVATE=test-only-token');
-  return root;
+  return {context, calls, env, request, pending};
 }
-function mock(configuration, handler) {
-  const calls = [];
-  const request = async (url, options) => {
-    const target = new URL(url);
-    assert.equal(target.origin, 'https://api.cloudflare.com');
-    assert.equal(options.headers.Authorization, 'Bearer test-only-token');
-    assert.equal(options.redirect, 'error'); assert(options.signal);
-    const endpoint = target.pathname.replace(`/client/v4/accounts/${env.CLOUDFLARE_ACCOUNT_ID}`, '') + target.search;
-    calls.push({endpoint, ...options});
-    if (endpoint === '/pages/projects/my-project') return Response.json({success: true, result: configuration});
-    const result = await handler(endpoint, options, calls);
-    return result instanceof Response ? result : Response.json({success: true, ...result});
-  };
-  return {request, calls};
+const json = result => Response.json({success: true, result});
+function server() {
+  const data = new Map(); let exists = false, creates = 0;
+  return {data, get creates() { return creates; }, fetch(url, options) {
+    const endpoint = url.pathname.replace(`/client/v4/accounts/${account}/storage/kv/namespaces`, '');
+    if (!endpoint && options.method === 'GET') return json(exists ? [{id, title: variables.KV_NAMESPACE_NAME}] : []);
+    if (!endpoint && options.method === 'POST') { assert.equal(JSON.parse(options.body).title, variables.KV_NAMESPACE_NAME); exists = true; creates++; return json({id}); }
+    if (endpoint === `/${id}`) return json({id});
+    assert(endpoint.startsWith(`/${id}/values/`)); const key = decodeURIComponent(endpoint.split('/values/')[1]);
+    if (options.method === 'PUT') { data.set(key, options.body); return json(null); }
+    return data.has(key) ? new Response(data.get(key)) : new Response('not found', {status: 404});
+  }};
 }
-
-test('new production deployment provisions KV and emits deploy metadata without leaking build secrets', async t => {
-  const root = await fixture(t);
-  const api = mock(project(), (endpoint, options) => {
-    if (options.method === 'GET') return {result: []};
-    assert.equal(endpoint, '/storage/kv/namespaces');
-    assert.equal(JSON.parse(options.body).title, 'forkedgetunnel-my-project-production-KV');
-    return {result: {id}};
-  });
-  assert.deepEqual(await 准备Pages(env, api.request, root), {项目名: 'my-project', 部署环境: 'production', 标识: id});
-  const config = await fs.readFile(path.join(root, 'wrangler.toml'), 'utf8');
-  assert.match(config, /pages_build_output_dir = "\.\/dist"/); assert.match(config, new RegExp(`id = "${id}"`));
-  assert.match(config, /"ADMIN" = "test-only-admin"/); assert.doesNotMatch(config, /test-only-token|PRIVATE|main =/);
-  assert.deepEqual((await fs.readdir(path.join(root, 'dist'))).sort(), ['_worker.js', 'admin', 'cdn-cgi', 'login', 'noADMIN', 'noKV'].sort());
-  assert.equal(await fs.readFile(path.join(root, 'dist', '_worker.js'), 'utf8'), 'export default {};');
+test('first deployment without native KV logs in, creates storage, saves and reopens config', async () => {
+  const backend = server(), runtime = await app(backend.fetch);
+  const login = await runtime.request('https://project.pages.dev/login', {method: 'POST', body: 'password=test-admin'});
+  assert.equal(login.status, 200); assert.equal(runtime.calls.length, 0);
+  const cookie = login.headers.get('Set-Cookie').split(';')[0];
+  const first = await runtime.request('https://project.pages.dev/admin/config.json', {headers: {Cookie: cookie}});
+  assert.equal(first.status, 200); const config = await first.json();
+  assert.equal(backend.creates, 1); assert(backend.data.has('config.json'));
+  config.优选订阅生成.SUBNAME = '持久化验证';
+  const saved = await runtime.request('https://project.pages.dev/admin/config.json', {method: 'POST', headers: {Cookie: cookie}, body: JSON.stringify(config)});
+  assert.equal(saved.status, 200); await Promise.all(runtime.pending);
+  const next = await app(backend.fetch);
+  const reopened = await next.request('https://project.pages.dev/admin/config.json', {headers: {Cookie: cookie}});
+  assert.equal((await reopened.json()).优选订阅生成.SUBNAME, '持久化验证'); assert.equal(backend.creates, 1);
+  const custom = await next.request('https://custom.example/admin/config.json', {headers: {Cookie: cookie}});
+  assert.equal((await custom.json()).优选订阅生成.SUBNAME, '持久化验证');
 });
-
-test('existing binding and other KV bindings are preserved, with no namespace creation or data writes', async t => {
-  const root = await fixture(t), configuration = project();
-  configuration.deployment_configs.production.kv_namespaces = {KV: {namespace_id: productionId}, OTHER: {namespace_id: otherId}};
-  const api = mock(configuration, endpoint => { assert.equal(endpoint, `/storage/kv/namespaces/${productionId}`); return {result: {id: productionId}}; });
-  await 准备Pages(env, api.request, root);
-  assert(api.calls.every(call => call.method === 'GET'));
-  const config = await fs.readFile(path.join(root, 'wrangler.toml'), 'utf8');
-  assert(config.includes(productionId)); assert(config.includes(otherId));
+test('ordinary visitors and unauthenticated admin requests do not access the API', async () => {
+  const runtime = await app(() => { throw new Error('Unexpected API request'); });
+  assert.equal((await runtime.request('https://project.pages.dev/')).status, 404);
+  assert.equal((await runtime.request('https://project.pages.dev/admin')).status, 302);
+  assert.equal((await runtime.request('https://project.pages.dev/login')).status, 200); assert.equal(runtime.calls.length, 0);
+  vm.runInContext("处理WS请求 = async () => new Response('ws'); 处理gRPC请求 = async () => new Response('grpc');", runtime.context);
+  await runtime.request('https://project.pages.dev/channel', {headers: {Upgrade: 'websocket'}});
+  await runtime.request('https://project.pages.dev/channel', {method: 'POST', headers: {'Content-Type': 'application/grpc'}});
+  assert.equal(runtime.calls.length, 0, 'Transport requests must not access the storage API');
 });
-
-test('preview gets an isolated namespace, and pagination reuses a previous build resource', async t => {
-  const root = await fixture(t), configuration = project();
-  configuration.deployment_configs.production.kv_namespaces = {KV: {namespace_id: productionId}};
-  const api = mock(configuration, (endpoint, options) => {
+test('native binding wins, existing namespace ID is preserved, and keys are URL encoded', async () => {
+  const backend = server(), runtime = await app(backend.fetch), native = {get() {}};
+  assert.equal(runtime.context.storage({...variables, KV: native}), native);
+  const storage = runtime.context.storage({...variables, KV_NAMESPACE_ID: id});
+  await storage.put('中文 /?#', 'saved'); assert.equal(await storage.get('中文 /?#'), 'saved');
+  assert.equal(backend.creates, 0); assert.equal(backend.data.get('中文 /?#'), 'saved');
+  assert(runtime.calls.every(call => !call.url.includes('page=')));
+});
+test('concurrent first writes share initialization, and 10014 creation races are recovered', async () => {
+  const backend = server(), runtime = await app(backend.fetch), storage = runtime.context.storage(variables);
+  await Promise.all([storage.put('one', '1'), storage.put('two', '2')]); assert.equal(backend.creates, 1);
+  let lists = 0;
+  const raced = await app((url, options) => options.method === 'POST'
+    ? Response.json({success: false, errors: [{code: 10014}]}, {status: 400})
+    : url.search ? json(++lists === 1 ? [] : [{title: variables.KV_NAMESPACE_NAME, id}]) : new Response('restored'));
+  assert.equal(await raced.context.storage(variables).get('config.json'), 'restored');
+  const paged = await app((url, options) => {
     assert.equal(options.method, 'GET');
-    if (endpoint.endsWith('page=1')) return {result: Array.from({length: 100}, (_, index) => ({title: `other-${index}`, id: otherId})), result_info: {total_pages: 2}};
-    assert(endpoint.endsWith('page=2'));
-    return {result: [{title: 'forkedgetunnel-my-project-preview-KV', id}]};
+    if (!url.search) return new Response('existing');
+    return json(url.searchParams.get('page') === '1' ? Array.from({length: 100}, (_, index) => ({title: `other-${index}`, id})) : [{title: variables.KV_NAMESPACE_NAME, id}]);
   });
-  const result = await 准备Pages({...env, CF_PAGES_BRANCH: 'feature/test'}, api.request, root);
-  assert.equal(result.部署环境, 'preview'); assert.equal(result.标识, id);
-  assert.doesNotMatch(await fs.readFile(path.join(root, 'wrangler.toml'), 'utf8'), new RegExp(productionId));
+  assert.equal(await paged.context.storage(variables).get('config.json'), 'existing');
 });
-
-test('concurrent namespace creation reuses the winning resource', async t => {
-  const root = await fixture(t); let lists = 0;
-  const api = mock(project(), (endpoint, options) => {
-    if (options.method === 'POST') return Response.json({success: false, errors: [{code: 10014}]}, {status: 400});
-    return {result: ++lists === 1 ? [] : [{title: 'forkedgetunnel-my-project-production-KV', id}]};
-  });
-  assert.equal((await 准备Pages(env, api.request, root)).标识, id);
-  assert.equal(api.calls.filter(call => call.method === 'POST').length, 1);
-});
-
-test('bad permissions, stale binding and extra resource bindings fail without overwriting config', async t => {
-  for (const mode of ['permission', 'stale', 'extra', 'hidden-var', 'invalid-binding']) {
-    const root = await fixture(t), configuration = project();
-    if (mode === 'stale') configuration.deployment_configs.production.kv_namespaces = {KV: {namespace_id: productionId}};
-    if (mode === 'extra') configuration.deployment_configs.production.d1_databases = {DB: {id}};
-    if (mode === 'hidden-var') configuration.deployment_configs.production.env_vars.ADMIN.value = null;
-    if (mode === 'invalid-binding') configuration.deployment_configs.production.kv_namespaces = {KV: {}};
-    const original = await fs.readFile(path.join(root, 'wrangler.toml'), 'utf8');
-    const api = mock(configuration, () => Response.json({success: false, errors: [{code: 10000}]}, {status: 403}));
-    await assert.rejects(准备Pages(env, api.request, root), error => { assert(!error.message.includes(env.CLOUDFLARE_API_TOKEN)); return true; });
-    assert.equal(await fs.readFile(path.join(root, 'wrangler.toml'), 'utf8'), original);
-    assert(api.calls.every(call => call.method === 'GET'));
+test('API authorization errors yield 503, never default config or a false successful save', async () => {
+  const runtime = await app(() => Response.json({success: false, errors: [{message: 'test-token'}]}, {status: 403}));
+  const login = await runtime.request('https://project.pages.dev/login', {method: 'POST', body: 'password=test-admin'});
+  const cookie = login.headers.get('Set-Cookie').split(';')[0];
+  for (const init of [{headers: {Cookie: cookie}}, {method: 'POST', headers: {Cookie: cookie}, body: '{}'}]) {
+    const response = await runtime.request('https://project.pages.dev/admin/config.json', init);
+    assert.equal(response.status, 503); const message = await response.text(); assert(message.includes('HTTP 403')); assert(!message.includes('test-token'));
   }
+  let denyWrites = false; const backend = server();
+  const ready = await app((url, options) => denyWrites && options.method === 'PUT' ? Response.json({success: false}, {status: 403}) : backend.fetch(url, options));
+  const authenticated = await ready.request('https://project.pages.dev/login', {method: 'POST', body: 'password=test-admin'});
+  const headers = {Cookie: authenticated.headers.get('Set-Cookie').split(';')[0]};
+  const config = await (await ready.request('https://project.pages.dev/admin/config.json', {headers})).json();
+  denyWrites = true;
+  assert.equal((await ready.request('https://project.pages.dev/admin/config.json', {method: 'POST', headers, body: JSON.stringify(config)})).status, 503);
 });
-
-test('missing credentials and invalid build context make no API calls', async t => {
-  const root = await fixture(t); let calls = 0;
-  const request = () => { calls++; throw new Error('Should not run'); };
-  for (const overrides of [{CLOUDFLARE_API_TOKEN: ''}, {CLOUDFLARE_ACCOUNT_ID: 'not-an-account'}, {CF_PAGES_URL: 'https://outside.example'}, {CF_PAGES_BRANCH: ''}]) {
-    await assert.rejects(准备Pages({...env, ...overrides}, request, root));
-  }
-  assert.equal(calls, 0);
+test('initialization failures can retry; non-404 reads and failed writes are not hidden', async () => {
+  let fail = true; const backend = server();
+  const runtime = await app((url, options) => fail ? new Response('failure', {status: 503}) : backend.fetch(url, options));
+  const storage = runtime.context.storage(variables);
+  await assert.rejects(storage.get('x')); fail = false; assert.equal(await storage.get('x'), null);
+  fail = true; await assert.rejects(storage.get('x')); await assert.rejects(storage.put('x', 'value'));
+  const redirected = await app(() => new Response(null, {status: 302, headers: {Location: 'https://outside.example'}}));
+  await assert.rejects(redirected.context.storage(variables).get('x')); assert.equal(redirected.calls.length, 1);
+});
+test('Pages preparation needs no credentials and does not rewrite deployment config', async t => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'forkedgetunnel-pages-'));
+  t.after(async () => { assert.equal(path.dirname(path.resolve(root)), path.resolve(os.tmpdir())); assert(path.basename(root).startsWith('forkedgetunnel-pages-')); await fs.rm(root, {recursive: true, force: true}); });
+  const original = 'main = "_worker.js"'; await fs.writeFile(path.join(root, 'wrangler.toml'), original);
+  for (const name of ['_worker.js', 'admin', 'login', 'noADMIN', 'noKV', 'cdn-cgi']) await fs.writeFile(path.join(root, name), name);
+  await fs.writeFile(path.join(root, '.env'), 'secret'); await 准备Pages(root);
+  assert.equal(await fs.readFile(path.join(root, 'wrangler.toml'), 'utf8'), original);
+  assert.deepEqual((await fs.readdir(path.join(root, 'dist'))).sort(), ['_worker.js', 'admin', 'login', 'noADMIN', 'noKV', 'cdn-cgi'].sort());
 });

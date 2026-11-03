@@ -7,7 +7,21 @@ GNU General Public License, version 2.
 
 # 开发记录
 
-## Pages Git 构建自动准备 KV（2026-11-03）
+## 无原生 KV 绑定的首次部署可用性修复（2026-11-03）
+
+- 用户实际部署仍看到“绑定名为 KV 的命名空间”页面，说明上一轮本地 multipart 元数据检查不足以证明 Pages Git 线上绑定已经建立；尚未取得该次构建日志，不能断言是脚本未执行、平台配置快照还是其他原因。确定的代码问题是运行时仍硬依赖 `env.KV`。本轮从运行时消除该硬依赖，不再把构建通过当作线上绑定成功。
+- 有原生 `KV` 时直接复用，保持原路径。没有绑定时，首次部署的环境变量填写 `ADMIN`、`CLOUDFLARE_ACCOUNT_ID`、加密的 `CLOUDFLARE_API_TOKEN`、固定项目专用的 `KV_NAMESPACE_NAME`；Token 只需当前账号的 Workers KV Storage 编辑权限。已有数据用 `KV_NAMESPACE_ID` 指向原命名空间，优先于名称；绝不为失效 ID 自动创建另一份空配置。
+- 新增 `获取配置存储` 兼容现有全部文本 get/put 调用，不提供未使用的接口。首次实际读取配置时才查找/创建命名空间，后续缓存 ID；名称必须固定，不从请求域名、随机部署 URL、密码或 UUID 派生，防止换域名或改密码后误选另一份数据。生产和预览在环境变量中明确使用不同名称。并发初始化共享 Promise，跨实例重名创建错误后重新查找，失败可重试；原生绑定始终优先。
+- 入口仅在普通 HTTP 配置处理分支补充兼容存储。对象创建本身不发请求；未经鉴权的后台访问、登录页面、公开页面和 WS/gRPC/XHTTP 数据转发都不会创建或调用存储 API。后台/订阅使用 API 相比原生绑定有额外延迟和账号 API 额度消耗，不能宣传与原生 KV 等价的性能。没有缓存键值或增加配置并发写入规则，避免带入新的一致性问题。
+- API 只允许固定 Cloudflare 域名，Bearer Token 仅发给该域名；键名 encodeURIComponent，使用 15 秒超时，不输出上游响应正文或 Token。**本地真实 workerd 发现 `redirect: 'error'` 不受此边缘运行时支持，而 Node 模拟会接受；已改用 `manual` 并把 3xx 当失败，禁止跟随携带凭据的重定向。** 后续不能仅靠 Node 测试验证平台 fetch 选项。
+- API 异常带专用标记，由入口转换为清楚的 503 JSON。配置初始化及可选 TG/CF 配置读取遇到存储接口错误会重新抛出，不套用原来“出错就用默认值”的逻辑；保存失败不返回成功。真正不存在的键才返回 null，初始化、权限、网络、非 404 读取失败不能假装无数据。KV 日志仍遵循原有 OFF_LOG 和后台任务处理。
+- `scripts/prepare-pages.cjs` 改为只复制运行资源到 dist，不再创建资源、生成绑定或改写 Wrangler 配置；保留同一构建命令以减少现有设置改动。`noKV/index.html` 和 README 改为同时说明原生绑定及首次填写变量的方案，不再只让用户去补绑。运行时兼容存储不等于平台原生绑定，也不需要补绑或重新发布才能使用刚创建的命名空间。
+- 替换 `tests/pages-kv.test.cjs`：7 项回归覆盖完整无原生绑定登录→创建→保存→新运行实例重开、域名切换复用、原生优先、原 ID 复用、键名编码、并发与重名恢复、权限失败 503、初始化重试和读写失败、构建不需要 Token 且不改配置。另有本地 Miniflare/workerd 测试使用假 API、禁止外网，验证实际 Worker 无原生 KV 时的登录/创建/保存/重读通过；旧传输入口本地运行检查通过。真实 Cloudflare 账号权限及线上部署仍未验收。
+- Pages `functions build` 编译和实际 multipart 包检查通过：上传元数据不再提交/覆盖绑定清单，由平台保留控制台变量与绑定；dist 仅包含运行资源，源码 Wrangler 配置未被改写。原有 Worker 与三个前端离线测试、源码语法和 `git diff --check` 通过。保存配置、CF/TG 配置、优选和重置的内层错误捕获均需重新抛出存储接口错误，否则会挡住入口统一的 503 处理；测试已覆盖“初始化成功但后续 PUT 被拒绝”的情况，而不只测试首次读取失败。
+- 回退文件位于 `build/rollback/20261103-kv-runtime/`；原生 KV 数据没有迁移、删除或清空。若切换为原生绑定，必须绑定相同 ID。上轮已经生成的命名空间也可直接复用，不应重新建一个不同名称后误以为原配置丢失。
+- 一手依据：[命名空间创建 API](https://developers.cloudflare.com/api/resources/kv/subresources/namespaces/methods/create/)、[KV 文本值读写 API](https://developers.cloudflare.com/api/resources/kv/subresources/namespaces/subresources/values/)。本轮不宣称网络代理识别问题已解决。
+
+## Pages Git 构建自动准备 KV（2026-11-03，已由运行时备用方案替代）
 
 - 用户确认使用 Pages 关联 GitHub。当前需求是减少部署操作；用户反馈之前网络特征隐藏效果仍不足，但没有新的网络识别验收证据，本轮不宣称已解决识别问题，也不修改传输逻辑。
 - 新增 `scripts/prepare-pages.cjs`。Pages 构建命令设为 `node scripts/prepare-pages.cjs`，输出目录设为 `dist`，首次部署前一次性设置 `ADMIN`、`CLOUDFLARE_ACCOUNT_ID` 和加密 `CLOUDFLARE_API_TOKEN`。Token 权限为当前账号的 Cloudflare Pages 读取与 Workers KV Storage 编辑；脚本使用 Pages 提供的 `CF_PAGES_URL` 和 `CF_PAGES_BRANCH` 确定项目及环境，不需要另填项目名。

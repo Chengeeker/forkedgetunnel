@@ -50,6 +50,88 @@ const 汇聚请求标识 = 'v2rayN/edge' + 'tunnel (https://github.com/' + 特�
 ///////////////////////////////////////////////////////主程序入口///////////////////////////////////////////////
 export default {
 	async fetch(传入请求, 环境绑定, 执行上下文) {
+		try { return await 处理入口请求(传入请求, 环境绑定, 执行上下文); }
+		catch (错误) {
+			if (!错误?.存储接口错误) throw 错误;
+			return new Response(JSON.stringify({ error: 错误.message }), { status: 503, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' } });
+		}
+	}
+};
+
+const 接口存储缓存 = new Map();
+function 获取配置存储(环境) {
+	if (typeof 环境.KV?.get === 'function') return 环境.KV;
+	const 账号 = String(环境.CLOUDFLARE_ACCOUNT_ID || '').trim(), 令牌 = String(环境.CLOUDFLARE_API_TOKEN || '').trim();
+	const 指定标识 = String(环境.KV_NAMESPACE_ID || '').trim(), 名称 = String(环境.KV_NAMESPACE_NAME || '').trim();
+	if (!账号 || !令牌 || (!指定标识 && !名称)) return 环境.KV;
+	const 报错 = 信息 => Object.assign(new Error(信息), { 存储接口错误: true });
+	if (!/^[a-f0-9]{32}$/i.test(账号) || (指定标识 && !/^[a-f0-9]{32}$/i.test(指定标识)) || 名称.length > 512) throw 报错('配置存储变量格式无效，请检查账号 ID、KV_NAMESPACE_ID 或 KV_NAMESPACE_NAME。');
+	const 缓存键 = JSON.stringify([账号, 令牌, 指定标识, 名称]);
+	if (接口存储缓存.has(缓存键)) return 接口存储缓存.get(缓存键);
+	async function 请求接口(端点, 方法 = 'GET', 内容) {
+		try {
+			return await fetch(`https://api.cloudflare.com/client/v4/accounts/${账号}/storage/kv/namespaces${端点}`, {
+				method: 方法, headers: { Authorization: `Bearer ${令牌}`, 'Content-Type': 方法 === 'POST' ? 'application/json' : 'text/plain; charset=utf-8' },
+				body: 内容, redirect: 'manual', signal: AbortSignal.timeout(15000),
+			});
+		} catch (_) { throw 报错('配置存储 API 连接失败，请检查网络及 API Token；配置未保存。'); }
+	}
+	async function 读取结果(响应) {
+		let 数据;
+		try { 数据 = await 响应.json(); } catch (_) { throw 报错('配置存储 API 返回无效数据；配置未保存。'); }
+		if (!响应.ok || 数据?.success !== true) {
+			const 错误 = 报错(`配置存储 API 请求失败（HTTP ${响应.status}），请检查 Workers KV Storage 编辑权限及资源是否存在；配置未保存。`);
+			错误.重复名称 = Array.isArray(数据?.errors) && 数据.errors.some(项 => 项.code === 10014);
+			throw 错误;
+		}
+		return 数据;
+	}
+	let 初始化任务 = null;
+	async function 获取命名空间() {
+		if (!初始化任务) 初始化任务 = (async () => {
+			if (指定标识) {
+				const 数据 = await 读取结果(await 请求接口(`/${指定标识}`));
+				if (String(数据.result?.id || '').toLowerCase() !== 指定标识.toLowerCase()) throw 报错('无法确认原配置存储 ID；不会自动替换原有数据。');
+				return 指定标识;
+			}
+			async function 查找() {
+				for (let 页码 = 1; ; 页码++) {
+					const 数据 = await 读取结果(await 请求接口(`?per_page=100&page=${页码}`));
+					if (!Array.isArray(数据.result)) throw 报错('配置存储清单无效；配置未保存。');
+					const 命中 = 数据.result.find(项 => 项.title === 名称);
+					if (命中) return 命中.id;
+					if (数据.result.length < 100 || 页码 >= 数据.result_info?.total_pages) return null;
+				}
+			}
+			let 标识 = await 查找();
+			if (!标识) {
+				try { 标识 = (await 读取结果(await 请求接口('', 'POST', JSON.stringify({ title: 名称 })))).result?.id; }
+				catch (错误) { if (!错误.重复名称) throw 错误; 标识 = await 查找(); }
+			}
+			if (!/^[a-f0-9]{32}$/i.test(标识 || '')) throw 报错('未取得有效的配置存储 ID；配置未保存。');
+			return 标识;
+		})().catch(错误 => { 初始化任务 = null; throw 错误; });
+		return 初始化任务;
+	}
+	const 存储 = {
+		async get(键) {
+			const 标识 = await 获取命名空间();
+			const 响应 = await 请求接口(`/${标识}/values/${encodeURIComponent(键)}`);
+			if (响应.status === 404) return null;
+			if (!响应.ok) { await 读取结果(响应); throw 报错('配置存储读取失败。'); }
+			try { return await 响应.text(); } catch (_) { throw 报错('配置存储读取中断；请重试。'); }
+		},
+		async put(键, 值) {
+			const 标识 = await 获取命名空间();
+			await 读取结果(await 请求接口(`/${标识}/values/${encodeURIComponent(键)}`, 'PUT', 值));
+		},
+	};
+	if (接口存储缓存.size >= 8) 接口存储缓存.delete(接口存储缓存.keys().next().value);
+	接口存储缓存.set(缓存键, 存储);
+	return 存储;
+}
+
+async function 处理入口请求(传入请求, 环境绑定, 执行上下文) {
 		let 请求URL文本 = 传入请求.url.replace(/%5[Cc]/g, '').replace(/\\/g, '');
 		const 请求URL锚点索引 = 请求URL文本.indexOf('#');
 		const 请求URL主体部分 = 请求URL锚点索引 === -1 ? 请求URL文本 : 请求URL文本.slice(0, 请求URL锚点索引);
@@ -124,6 +206,7 @@ export default {
 		} else {
 			if (请求地址对象.protocol === 'http:') return Response.redirect(请求地址对象.href.replace(`http://${请求地址对象.hostname}`, `https://${请求地址对象.hostname}`), 301);
 			if (!管理员密码) return 获取管理页面资源(传入请求, 环境绑定, 管理页面地址, '/noADMIN/index.html', '/noADMIN').then(r => { const 报头集合 = new Headers(r.headers); 报头集合.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate'); 报头集合.set('Pragma', 'no-cache'); 报头集合.set('Expires', '0'); return new Response(r.body, { status: 404, statusText: r.statusText, headers: 报头集合 }) });
+			环境绑定 = { ...环境绑定, KV: 获取配置存储(环境绑定) };
 			if (环境绑定.KV && typeof 环境绑定.KV.get === 'function') {
 				const 区分大小写访问路径 = 请求地址对象.pathname.slice(1);
 				if (区分大小写访问路径 === 加密秘钥 && 加密秘钥 !== '勿动此默认密钥，有需求请自行通过添加变量KEY进行修改') {//快速订阅
@@ -256,6 +339,7 @@ export default {
 							运行配置.init = '配置已重置为默认值';
 							return new Response(JSON.stringify(运行配置, null, 2), { status: 200, headers: { 'Content-Type': 'application/json;charset=utf-8' } });
 						} catch (失败原因) {
+							if (失败原因?.存储接口错误) throw 失败原因;
 							const 错误响应内容 = { msg: '配置重置失败，失败原因：' + 失败原因.message, error: 失败原因.message };
 							return new Response(JSON.stringify(错误响应内容, null, 2), { status: 500, headers: { 'Content-Type': 'application/json;charset=utf-8' } });
 						}
@@ -271,6 +355,7 @@ export default {
 								执行上下文.waitUntil(请求日志记录(环境绑定, 传入请求, 访问IP, 'Save_Config', 运行配置));
 								return new Response(JSON.stringify({ success: true, message: '配置已保存' }), { status: 200, headers: { 'Content-Type': 'application/json;charset=utf-8' } });
 							} catch (异常对象) {
+								if (异常对象?.存储接口错误) throw 异常对象;
 								console.error('保存配置失败:', 异常对象);
 								return new Response(JSON.stringify({ error: '保存配置失败: ' + 异常对象.message }), { status: 500, headers: { 'Content-Type': 'application/json;charset=utf-8' } });
 							}
@@ -297,6 +382,7 @@ export default {
 								执行上下文.waitUntil(请求日志记录(环境绑定, 传入请求, 访问IP, 'Save_Config', 运行配置));
 								return new Response(JSON.stringify({ success: true, message: '配置已保存' }), { status: 200, headers: { 'Content-Type': 'application/json;charset=utf-8' } });
 							} catch (异常对象) {
+								if (异常对象?.存储接口错误) throw 异常对象;
 								console.error('保存配置失败:', 异常对象);
 								return new Response(JSON.stringify({ error: '保存配置失败: ' + 异常对象.message }), { status: 500, headers: { 'Content-Type': 'application/json;charset=utf-8' } });
 							}
@@ -313,6 +399,7 @@ export default {
 								执行上下文.waitUntil(请求日志记录(环境绑定, 传入请求, 访问IP, 'Save_Config', 运行配置));
 								return new Response(JSON.stringify({ success: true, message: '配置已保存' }), { status: 200, headers: { 'Content-Type': 'application/json;charset=utf-8' } });
 							} catch (异常对象) {
+								if (异常对象?.存储接口错误) throw 异常对象;
 								console.error('保存配置失败:', 异常对象);
 								return new Response(JSON.stringify({ error: '保存配置失败: ' + 异常对象.message }), { status: 500, headers: { 'Content-Type': 'application/json;charset=utf-8' } });
 							}
@@ -323,6 +410,7 @@ export default {
 								执行上下文.waitUntil(请求日志记录(环境绑定, 传入请求, 访问IP, 'Save_Custom_IPs', 运行配置));
 								return new Response(JSON.stringify({ success: true, message: '自定义IP已保存' }), { status: 200, headers: { 'Content-Type': 'application/json;charset=utf-8' } });
 							} catch (异常对象) {
+								if (异常对象?.存储接口错误) throw 异常对象;
 								console.error('保存自定义IP失败:', 异常对象);
 								return new Response(JSON.stringify({ error: '保存自定义IP失败: ' + 异常对象.message }), { status: 500, headers: { 'Content-Type': 'application/json;charset=utf-8' } });
 							}
@@ -597,7 +685,6 @@ export default {
 		} catch (异常对象) { }
 		return new Response(await 生成默认欢迎页面(), { status: 200, headers: { 'Content-Type': 'text/html; charset=UTF-8' } });
 	}
-};
 ///////////////////////////////////////////////////////////////////////叉HTTP传输数据///////////////////////////////////////////////
 const HPACKHuffman码长 = [
 	13, 23, 28, 28, 28, 28, 28, 28, 28, 24, 30, 28, 28, 30, 28, 28,
@@ -6085,6 +6172,7 @@ async function 读取config_JSON(环境绑定, hostname, 用户凭据标识, 请
 			运行配置 = JSON.parse(configJSON);
 		}
 	} catch (异常对象) {
+		if (异常对象?.存储接口错误) throw 异常对象;
 		console.error(`读取config_JSON出错: ${异常对象.message}`);
 		运行配置 = 默认配置JSON;
 	}
@@ -6105,6 +6193,7 @@ async function 读取config_JSON(环境绑定, hostname, 用户凭据标识, 请
 		try {
 			await 环境绑定.KV.put('config.json', JSON.stringify(运行配置, null, 2));
 		} catch (异常对象) {
+			if (异常对象?.存储接口错误) throw 异常对象;
 			console.warn('写入 forkedgetunnel 默认配置迁移失败:', 异常对象?.message || 异常对象);
 		}
 	}
@@ -6208,6 +6297,7 @@ async function 读取config_JSON(环境绑定, hostname, 用户凭据标识, 请
 			运行配置.TG.BotToken = TG_JSON.BotToken ? 掩码敏感信息(TG_JSON.BotToken) : null;
 		}
 	} catch (异常对象) {
+		if (异常对象?.存储接口错误) throw 异常对象;
 		console.error(`读取tg.json出错: ${异常对象.message}`);
 	}
 
@@ -6238,6 +6328,7 @@ async function 读取config_JSON(环境绑定, hostname, 用户凭据标识, 请
 			}
 		}
 	} catch (异常对象) {
+		if (异常对象?.存储接口错误) throw 异常对象;
 		console.error(`读取cf.json出错: ${异常对象.message}`);
 	}
 
