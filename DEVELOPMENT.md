@@ -7,6 +7,33 @@ GNU General Public License, version 2.
 
 # 开发记录
 
+## 减少未认证网络探测线索（2026-11-03）
+
+- 本轮在前一轮中文命名结果上继续修改，保留其未提交代码。变更前的 Worker、开发记录、README 和兼容性测试保存于 `build/rollback/20261103-network/`；不要把前一轮的原始英文版回退副本误当成本轮基线。
+- 原先无效 POST 返回 `Bad Request`、`Invalid request`，gRPC 在鉴权前即返回 `application/grpc`；默认公开页还是固定 nginx 模板。本轮使无效传输返回调用入口，由入口统一处理公开回退。`URL` 留空时普通访问和无效传输统一返回 `404 Not Found`，不附带协议响应头；后台、登录、订阅鉴权和版本接口保留。README 的 `URL` 说明已同步，显式设置 `URL=nginx` 或 `1101` 仍保留原页面行为。
+- 使用外部 `URL` 回退时，无效传输只 GET 公开首页，不透传失败请求的正文、路径/查询参数、Cookie 或认证头，避免把节点参数和会话交给第三方。读取失败、错误凭据和超限请求会释放读取锁并取消未完成的上传；不向外部站点重放已消费的流。普通非传输请求的既有页面转发行为保留。
+- gRPC 复用原解析器，VLESS/Trojan 首包解析并校验凭据后才返回协议响应头。只等待完整首包，不等待上传结束或出口拨号，不增加额外往返、随机延迟或填充流量。首包未认证时拒绝声明超过既有 16 MiB 上行队列上限的帧，并按无符号长度读取，避免恶意高位长度导致异常循环或持续缓存。已认证的数据帧、封装和上下行队列不变。
+- WebSocket 只把原来必然失败的超限早期数据提前到升级前拒绝；普通子协议（例如 `binary`）、无早期数据的客户端、合法早期数据、SS 模式禁用 early-data 的历史修复均保留。没有强制所有客户端先提供路径密钥或 early-data，避免旧节点断连。畸形百分号路径不再使链式参数解码抛出未处理异常，不能用平台异常页暴露该内部错误。
+- 新生成的 XHTTP 链接在现有 `extra` 内增加 Xray 原生 `noGRPCHeader: true`，支持该选项的客户端不再为原始 XHTTP 上传额外附加 gRPC 内容类型头；现有随机 padding、本机标识和 stream-one 模式保留。旧链接仍可使用原来带 gRPC 头和 padding 标记的方式。面板使用后端生成的 `LINK`，无须另造前端编码实现；需要重新获取节点或更新订阅才能获得新参数，第三方转换器和客户端是否保留该字段仍需实际验收。
+- 不改外层 TLS、客户端指纹、默认 ECH、代理协议字节、成功连接必需的响应头、订阅转换 User-Agent 或本机标识规则，避免重犯先前的上游兼容问题。保留 WS 禁用压缩的现有处理和 `X-Accel-Buffering` 流式提示，没有为了减少头字段改变压缩或缓冲行为。管理入口仍保留既有访问方式。本轮是减少具体探测线索，不保证流量不可识别，也不能阻止托管平台看到源码、连接和转发行为。
+- 扩展 `tests/worker-compatibility.test.cjs` 并通过：无效/空 POST、错误凭据和超大 gRPC 帧、读取异常、超限 WS early-data、畸形路径的公开响应一致；失败上传取消；合法 VLESS/Trojan 的 gRPC/XHTTP 结果、旧 XHTTP 带 gRPC 头的方式；分片首包鉴权前不泄露响应头，鉴权后在上传和模拟拨号未结束时仍可读取响应；外部回退不泄露凭据；原来的登录、协议、加密和链式测试保留通过。另三个前端离线测试也通过。
+- 使用已安装 Wrangler 附带的 Miniflare/workerd 做本地运行检查，阻断外网出口：gRPC/XHTTP 返回内容、WebSocket 普通消息及合法 early-data 的 204 往返、`binary` 子协议、SS 升级握手和无效探测的 404 均通过。测试只走本机，没有验证真实代理出口、SS 完整加密会话、Bettbox/其他实际客户端、Cloudflare 线上响应或真实流量识别效果。临时运行脚本位于 Git 忽略的 `tmp/check-worker-runtime.cjs`，没有新增项目依赖。
+- 源码及打包输出的 `node --check`、`git diff --check` 和 Wrangler `deploy --dry-run` 均通过。当前产物为 `build/network-worker/_worker.js`，gzip 为 86.74 KiB，相比本轮前的中文版本 86.39 KiB 增加约 0.35 KiB。没有执行 Cloudflare 发布或修改线上配置；后续 GitHub 推送若关联平台自动构建，发布状态需另行核对。
+- 本轮推送目标为远端 `forkedgetunnel` 的 `Chengeeker/forkedgetunnel:main`。本地 `main` 跟踪 `forkedgetunnel/main`，而 `origin` 指向 `Chengeeker/edgetunnel`；推送时必须按实际仓库地址选择远端，避免重复此前推错仓库的问题。
+- 依据使用协议与平台的一手资料，不采纳宣传性结论：[Xray XHTTP 请求头实现](https://github.com/XTLS/Xray-core/blob/main/transport/internet/splithttp/config.go)、[Xray gRPC 写入实现](https://github.com/XTLS/Xray-core/blob/main/transport/internet/grpc/encoding/hunkconn.go)、[Cloudflare WebSocket 压缩兼容开关](https://developers.cloudflare.com/workers/configuration/compatibility-flags/#websocket-compression)。Xray 的 gRPC 写入会发送首条消息，不以先收到应用响应头作为发送前提；其他客户端的运行行为不由这项源码核对代替。
+
+## Worker 中文内部命名（2026-11-03）
+
+- 修改基线为本地 `main` 的 `597431d`，开始时工作区干净。本轮只修改 Worker 内部名称，管理面板 HTML/事件入口、部署配置和现有功能不变；这是 JavaScript 的中文标识符整理，不是另一种编程语言。
+- 212 个内部函数、类、常量和主要变量改用中文，共更新 2,448 处引用。范围包括请求入口、字节流/数据报转发、链式连接、安全层握手和加解密、订阅热补丁及平台用量查询。局部算法变量、平台 API 和对外数据字段仍有英文，不宣称全项目已经完全中文化。
+- 兼容性重点：管理面板 `fetchLatestOnlineVersionNumber()` 会以正则匹配 Worker 源码首行的 `const Version`，因此保留名称和版本值；`/version` 仍返回数字 `Version`。保留环境变量和 KV/JSON 键、认证算法、UUID、Cookie、URL/查询参数、协议字节、订阅格式、User-Agent 和本机标识派生规则。特别不能重犯上次同步修复过的版本识别、本机标识或订阅转换兼容问题。
+- 使用语法树定位标识符，只修改内部绑定和引用；对象简写展开为原英文键加中文变量，避免重命名时连带改变 API、配置或协议字段。名称目标经过全文件碰撞检查。对改名后的语法树逆映射比较通过，确认表达式、分支、字面量、对象键和协议内容一致。没有引入运行时解码、额外依赖、填充代码或新的网络请求；函数显示名称和异常栈中的内部名称会随改名变化。
+- 中文命名只减少源码中直接可见的英文内部名称，不改变也不隐藏 WebSocket、gRPC、XHTTP、安全层握手、出口连接和流量行为；不能据此保证不被平台或网络识别。许可证和来源说明保留，没有通过删掉认证、校验或错误处理来减少特征。
+- 新增 `tests/worker-compatibility.test.cjs`：离线检查登录成功/失败、未授权访问、版本接口与源码识别、三种传输入口分发、客户端字段、凭据解析和五种链式参数、字节流协议解析、分片记录及握手消息、中继报文；流式认证加密和分组认证加密与 Node 原生实现对比，包含认证篡改拒绝。同一套检查在改名前的临时副本上也通过。入口路由测试替换处理器，不代表真实网络握手或拨号验收。
+- 原有本地 Clash 实测、网络警告、应用专用监听配置三个离线测试均通过。未执行 Cloudflare 发布、真实代理拨号、实际客户端订阅更新或设备验收；本项目没有安卓构建目标，不生成 APK。
+- `node --check`（源码和打包输出）、`git diff --check`、Wrangler 4.128.0 的 `deploy --dry-run` 均通过；改名前后均进行了本地打包，没有上传。打包后 gzip 从 82.94 KiB 增至 86.39 KiB，约增加 3.45 KiB；没有增加逐请求计算步骤，但未测量平台真实冷启动、吞吐和延迟。当前产物在 `build/chinese-worker/_worker.js`，项目主入口仍为根目录 `_worker.js`。
+- 本地回退副本保存为 `build/rollback/20261103/_worker.js`（Git 忽略，不能当作新的部署入口）；原始版本也可从 `597431d` 恢复。后续合并上游时需按函数逻辑核对新旧命名，禁止对全文件进行文本替换，以免误改协议字符串、HTML 内联事件或对象键。
+
 ## 上游同步（2026-10-15）
 
 - 合并 `cmliu/edgetunnel` 的 `main` 至 `a8ab111`（对应上游 2026-10-08 更新），同时保留本 fork 的管理页面合并部署、默认配置、家宽链式、排序和本地 mihomo 测试等改动。

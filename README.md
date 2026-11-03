@@ -140,7 +140,7 @@ GNU General Public License, version 2. See LICENSE for the complete text.
 | **UUID** | ❌ | `90cd4a77-141a-43c9-991b-08263cfe9c10` | 强制固定UUID，只支持**UUIDv4**标准格式 |
 | **EDT_PAGES_URL** | ❌ | `https://your-pages.example.com` | 可选的外部管理面板回退地址（不要包含 `/admin`）；合并后的 Pages 部署无需填写，只有在使用普通 Worker 或想切换到外部面板时才需要 |
 | **PROXYIP** | ❌ | `proxyip.cmliussss.net` | 全局自定义反代 IP，默认值 |
-| **URL** | ❌ | `https://cloudflare-error-page-3th.pages.dev` | 默认主页伪装地址（可填写网页 URL 或 `1101`） |
+| **URL** | ❌ | `https://your-public-site.example` | 公开回退页面；留空时普通访问和无效传输请求返回相同的普通 404。可填网页 URL、`nginx` 或 `1101`；无效传输只以 GET 获取外部首页，不转发请求凭据和正文 |
 | **GO2SOCKS5** | ❌ | `blog.cmliussss.com`,`*.ip111.cn`,`*google.com` | 强制走 SOCKS5 的名单 (`*` 为全局，域名用逗号分隔) |
 | **DEBUG** | ❌ | `1`或`true` | **开发者模式**，默认**关闭**调试日志功能（console.log），设置`1`或`true`则**开启**调试日志功能 |
 | **OFF_LOG** | ❌ | `1`或`true` | 默认**开启**KV日志记录功能，设置`1`或`true`则**关闭**日志记录功能 |
