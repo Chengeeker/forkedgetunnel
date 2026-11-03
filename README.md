@@ -38,6 +38,9 @@ GNU General Public License, version 2. See LICENSE for the complete text.
 ---
 
 ## 💡 快速部署
+
+**如果你只填写了 `ADMIN`，并看到“尚未配置持久化存储”，请先看 [Pages + GitHub 完整操作步骤](#pages-github-setup)。** `ADMIN` 只负责后台登录；使用自动准备存储的方式，还需要账号 ID、API Token 和固定的存储名称。首次部署前填齐即可；已经部署后补加变量，需要触发一次新部署加载新变量。
+
 >[!TIP]
 > 📖 **详尽图文教程**：[edgetunnel 部署指南](https://cmliussss.com/p/edt2/)
 
@@ -96,25 +99,55 @@ GNU General Public License, version 2. See LICENSE for the complete text.
 
 </details>
 
+<a id="pages-github-setup"></a>
+
 ### 🛠 Pages + GitHub 部署方法（首次填变量，无需手动绑定 KV）
 
-<details>
+<details open>
 <summary><code><strong>「 Pages + GitHub 部署文字教程 」</strong></code></summary>
+
+本教程使用“通过 API 自动准备存储”的方式：**无需先去 KV 页面创建命名空间，也无需在 Pages 的绑定页面添加 `KV`**。程序在首次登录并读取后台配置时，才创建或复用真正的 KV 存储。创建资源需要你的账号授权，因此只填管理员密码无法完成这一步。
+
+#### 部署前准备：取得账号 ID 和 API Token
+
+**第一步：复制 Cloudflare 账号 ID。**
+
+1. 登录 [Cloudflare 控制台](https://dash.cloudflare.com/)，选择将要部署 Pages 项目的账号。
+2. 打开 **Workers & Pages**，在 **Account Details（账号详情）** 中复制 **Account ID**。也可使用控制台搜索框，输入 `Copy account ID` 后复制结果。
+3. 这就是 `CLOUDFLARE_ACCOUNT_ID` 的值，通常是 32 位十六进制字符串。请复制 **Account ID**，不要复制域名的 Zone ID。操作位置见 [Cloudflare 官方说明](https://developers.cloudflare.com/fundamentals/account/find-account-and-zone-ids/)。
+
+**第二步：创建允许读写 KV 的 API Token。**
+
+1. 打开 [My Profile → API Tokens](https://dash.cloudflare.com/profile/api-tokens)，点击 **Create Token（创建令牌）**。
+2. 选择 **Create Custom Token（创建自定义令牌）**，名称可以填 `forkedgetunnel-kv`。
+3. 在 **Permissions（权限）** 中添加一项：**Account（账号） → Workers KV Storage → Edit（编辑）**。
+4. 在 **Account Resources（账号资源）** 中选择 **Include（包括） → Specific account（指定账号）**，选中第一步复制 ID 的那个账号。
+5. 检查后点击 **Continue to summary → Create Token**，复制新显示的 **Token 完整值**。它就是 `CLOUDFLARE_API_TOKEN`，不是 Token ID，也不是 Global API Key。Token 完整值通常只显示一次，请妥善保存，并在 Pages 中加密填写。
+
+这个运行时存储方案只需要当前账号的 KV 编辑权限，不需要 Pages 编辑权限。创建 Token 的界面说明见 [Cloudflare 官方教程](https://developers.cloudflare.com/fundamentals/api/get-started/create-token/)。
+
+**第三步：确定一个固定的存储名称。**
+
+- 如果这是新项目，没有需要保留的配置，`KV_NAMESPACE_NAME` 可以填 `forkedgetunnel-myproject-production-KV`，将 `myproject` 换成你的项目名即可。**这是自己填写的名称，不用预先创建，也不是命名空间 ID。**
+- 填好后保持不变：以后换域名、改管理员密码或更新代码，都继续用这个名称。另一个项目应使用另一个名称；预览环境可用 `forkedgetunnel-myproject-preview-KV`，避免修改生产配置。
+- **如果原来已经有 KV 配置要保留，改填 `KV_NAMESPACE_ID` 为原命名空间 ID，并优先使用这个 ID。** 可到控制台的 KV 命名空间详情中复制 ID；不要随便填一个新名称，否则会选到一份新的空配置。上一个版本自动创建过命名空间的，也按这个方法使用原 ID，或准确填写它原来的名称。
+
+#### 新建 Pages 项目：首次保存并部署前填齐
 
 1. 部署 CF Pages：
    - 在 Github 上先 Fork 本项目，并点上 Star !!!
    - 在 CF Pages 控制台中选择 `连接到 Git` 后，选中你自己的 `forkedgetunnel` 仓库，进入构建设置。框架选择 `None`，构建命令填写 `node scripts/prepare-pages.cjs`，构建输出目录填写 `dist`，根目录保留仓库根目录；使用 V2 或更新的构建系统及 Node.js 20 或以上版本。
-   - 在**首次保存并部署前**添加以下环境变量。无需在这个页面创建绑定，也不要新增名为 `KV` 的普通文本变量：
+   - 在**首次保存并部署前**展开 **Environment variables（环境变量）**，逐项添加下表四个变量。变量名按表格原样填写，不带空格；不要新增名为 `KV` 的普通文本变量：
 
-     | 变量 | 内容 |
-     | --- | --- |
-     | `ADMIN` | 管理员密码，建议加密保存 |
-     | `CLOUDFLARE_ACCOUNT_ID` | 当前 Pages 项目所在账号的 Account ID |
-     | `CLOUDFLARE_API_TOKEN` | 加密保存的 API Token，限定当前账号，包含 **Workers KV Storage：Edit** 权限 |
-     | `KV_NAMESPACE_NAME` | 本项目固定的存储名称，例如 `forkedgetunnel-myproject-production-KV`；程序自动创建或复用该名称的命名空间 |
+     | 变量名 | 值填写什么 | 保存方式 |
+     | --- | --- | --- |
+     | `ADMIN` | 自己设置的后台登录密码 | 建议加密 |
+     | `CLOUDFLARE_ACCOUNT_ID` | 上面第一步复制的 Account ID | 普通文本 |
+     | `CLOUDFLARE_API_TOKEN` | 上面第二步创建的 Token 完整值 | **加密 / Secret** |
+     | `KV_NAMESPACE_NAME` | 上面第三步确定的固定名称，例如 `forkedgetunnel-myproject-production-KV` | 普通文本 |
 
-   - Token 必须由账号所有者预先授权；仓库代码无法自行获得创建资源的权限。不要使用或提交 Global API Key。预览环境使用不同的名称，例如 `forkedgetunnel-myproject-preview-KV`，以免修改生产数据。名称不要随域名、管理员密码或部署批次改变，否则会选到另一份配置。
-   - **已有数据时优先填写 `KV_NAMESPACE_ID` 为原命名空间 ID，代替按名称新建**。上一个构建脚本已创建过资源的，也可填它的原 ID，或把 `KV_NAMESPACE_NAME` 填为它的准确名称。
+   - 有原数据时，用 `KV_NAMESPACE_ID` 替换表中的 `KV_NAMESPACE_NAME`，值填原命名空间 ID。两者同时填写时，ID 优先。
+   - 核对四项填写完整后，再点击 **Save and Deploy（保存并部署）**。Token 仅填入 Cloudflare 的加密变量，不放到 GitHub、README 或聊天里。
    - 本仓库已经包含管理面板，构建只复制运行资源到 `dist`，不调用管理 API、不改写 `wrangler.toml`，也不发布 Token 或开发文档。Cloudflare 控制台中填写的环境变量由平台注入运行环境。
 
 2. 首次登录后自动准备存储：
@@ -131,6 +164,30 @@ GNU General Public License, version 2. See LICENSE for the complete text.
 
 4. 访问后台：
    - 访问 `https://lizi.fuck.cloudns.biz/admin` 输入管理员密码即可登录后台。
+   - 进入后台后修改一个设置并保存，重新打开后台确认仍被保留，即可检查存储是否工作。不要用“能打开登录页”来判断 KV 已创建，因为登录页不调用存储 API。
+
+#### 已经部署过，而且目前只填了 ADMIN
+
+这种情况不需要重新创建 Pages 项目。保留原来的管理员密码，补齐另外三项：
+
+1. 先按上面的准备步骤，取得账号 ID、创建 API Token，并确定存储名称；已有配置则复制原 KV 的 ID。
+2. 打开 **Workers & Pages → 你的 Pages 项目 → Settings（设置） → Variables and Secrets（变量和机密） → Add（添加）**。旧版界面可能显示为 **Environment variables（环境变量）**。
+3. 在当前访问的部署所对应的环境中添加变量：生产部署使用 **Production（生产）**；预览部署使用 **Preview（预览）**。不要只填在另一个环境里。
+4. 保留已有 `ADMIN`，补加 `CLOUDFLARE_ACCOUNT_ID`、加密的 `CLOUDFLARE_API_TOKEN`、`KV_NAMESPACE_NAME`（或已有存储的 `KV_NAMESPACE_ID`），逐项保存。原来使用小写 `admin` 也受程序支持，不必为了改变量名而更换密码。
+5. 到 **Deployments（部署）** 中，以新变量触发一次新部署或重试部署，等待成功后再打开 `/admin`。**修改变量不会让旧部署自动获得新值；已有项目补变量后，这一次发布仍然需要。** 以后新建项目时，在首次部署前填齐即可省去这一步，也不用再补绑 KV。
+
+Pages 变量、加密选项和部署生效规则见 [Cloudflare 官方说明](https://developers.cloudflare.com/pages/functions/bindings/#environment-variables)。如果此前采用过本仓库旧版“构建时生成 Wrangler 配置”的方式，请先同步到当前代码；当前构建脚本只复制资源，不再改写平台配置。
+
+#### 出现提示时按现象检查
+
+| 看到的现象 | 优先检查什么 |
+| --- | --- |
+| “尚未配置持久化存储” | 当前部署没有原生 KV，且没有读到完整的账号 ID、Token、存储名称或 ID。只有 `ADMIN` 会出现这条提示；检查变量名、生产/预览环境和最新部署是否加载了变量。此时程序还没进入创建资源的步骤。 |
+| “配置存储 API 请求失败”，HTTP 401/403 | 检查填写的是 Token 完整值、Token 是否有效、是否有 Workers KV Storage 编辑权限，以及所选账号与 Account ID 是否一致。 |
+| “配置存储 API 连接失败”或超时 | 检查该次部署的运行日志及 Cloudflare API 连通性；不要把未保存当成保存成功。 |
+| 更新或换域名后像是回到了默认配置 | 检查是否改了存储名称或 ID；应继续使用原命名空间。不要删除旧 KV 来尝试修复。 |
+
+如果还有问题，可以提供**变量名列表、部署环境、错误文字或 HTTP 状态码**来排查，不需要提供密码和 Token 值。
 
 </details>
 
