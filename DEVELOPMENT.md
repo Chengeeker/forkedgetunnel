@@ -16,6 +16,7 @@ GNU General Public License, version 2.
 - 官方 Windows AMD64 和 ARM64 的固定 SHA-256 保存在 `local-cfdata/upstream.json`，打包和启动均校验；源码分支只提交脚本、清单和许可证。ZIP 附带两种架构原始程序、UTF-8 BOM 的脚本（兼容 Windows PowerShell 5.1）及说明；发布附带对应上游源码 ZIP、许可证和 SHA256SUMS。原生组件独立采用 GPL-3.0-or-later，根 README 明确此例外；Worker/网页继续 GPL-2.0，未混入上游 GPL-3.0 程序源码。
 - `tests/cfdata-launcher.test.cjs` 检查 Windows 唤起、Android 引导、弹窗生命周期、固定端点与 URI 隔离；原在线检测、域名输入、非 CN 警告、本地 Clash 和专用监听测试继续通过，内联脚本编译及 Pages functions build 成功。源码按当前 Windows 包独立发布；`local-cfdata-v*` 标签触发 Windows Actions 构建和 GitHub Release，下载入口指向固定 1.0.0 版本。
 - Windows 实机完成安装、冷启动、重复启动与同版本重复安装复用进程、停止后重启；核对实际进程参数为固定回环地址及端口，直接 TCP 和 HTTP 成功。Chrome 真实页面显示 v1.8.5 且“已连接服务器”，核对截图位于忽略的 `build/local-cfdata/browser-check.png`。测试后本机服务已重新启动，未进行大规模扫描或修改用户 CFData 配置。浏览器的首次外部应用确认不自动绕过；网页按钮请求由回归验证，不将程序单独启动验收混称为所有浏览器唤起策略都已验收。
+- 正式标签 `local-cfdata-v1.0.0` 指向 `f13c3ab`，Actions [42353157988](https://github.com/Chengeeker/forkedgetunnel/actions/runs/42353157988) 构建及发布成功。实际重新下载公开 ZIP，SHA-256 为 `0cd897a8b9652335e801b10a781d0b882c0a3f0ffad52ecd3342a1cdd8a11de0`，解包检查启动/安装/停止脚本、许可证及清单齐全，两个后端 EXE 的流式 SHA-256 均与固定官方值一致。源码仓库不包含发布二进制。
 
 ## 在线优选失效恢复及域名输入（2026-11-07）
 
