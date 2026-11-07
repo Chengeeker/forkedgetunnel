@@ -59,11 +59,19 @@ $script:远端 = Project
 $script:拒绝创建 = $false
 $script:丢失删除响应 = $false
 $script:部署失败 = $false
+$script:命名空间 = @([pscustomobject]@{id=('b'*32); title='stable-KV'})
+$script:丢失KV响应 = $false
 function 调用CF接口 {
     param($状态, [string]$方法, [string]$路径, $内容=$null, [switch]$表单)
     $script:请求.Add("$方法 $路径")
     $基础="/accounts/$($状态.account)/pages/projects/demo"
-    if ($路径 -like '*/storage/kv/namespaces[?]*') { return @([pscustomobject]@{id=('b'*32); title='stable-KV'}) }
+    if ($路径 -like '*/storage/kv/namespaces[?]*') { return $script:命名空间 }
+    if ($方法 -eq 'POST' -and $路径 -like '*/storage/kv/namespaces') {
+        $新存储=[pscustomobject]@{id=('f'*32); title=$内容.title}
+        $script:命名空间 += $新存储
+        if ($script:丢失KV响应) { $script:丢失KV响应=$false; throw 'lost KV response' }
+        return $新存储
+    }
     if ($路径 -like '*/storage/kv/namespaces/*') { return @{id=$路径.Split('/')[-1]} }
     if ($方法 -eq 'GET' -and $路径 -eq $基础) { return $script:远端 }
     if ($方法 -eq 'DELETE') {
@@ -142,4 +150,72 @@ $script:远端.deployment_configs.production.kv_namespaces.KV.namespace_id=('e'*
 $状态.plan=生成重建计划 (Project)
 保存部署状态 $文件 $状态
 Throws { 执行重建 $状态 $文件 } 'KV 绑定不一致'
-Write-Host 'PASS: encrypted backup, secrets, KV preservation, domain recovery, failure and interrupted rebuild cases.'
+
+# Interactive choices are exercised with queued answers, without touching the user's saved profile.
+$script:回答=[Collections.Generic.Queue[string]]::new()
+function Read-Host {
+    param($Prompt, [switch]$AsSecureString)
+    if (-not $script:回答.Count) { throw "Unexpected prompt: $Prompt" }
+    $答案=$script:回答.Dequeue()
+    if ($AsSecureString) { return (ConvertTo-SecureString $答案 -AsPlainText -Force) }
+    return $答案
+}
+foreach ($答案 in @('3','1')) { $script:回答.Enqueue($答案) }
+Assert ((选择部署方式) -eq '1') 'Initial menu choice failed'
+foreach ($答案 in @('https://demo.pages.dev/admin','demo.pages.dev','Demo','my_demo','我的项目','demo')) { $script:回答.Enqueue($答案) }
+Assert ((输入项目名称) -ceq 'demo') 'Project name validation failed'
+$script:回答.Enqueue('')
+Assert ((输入项目名称 'demo') -ceq 'demo') 'Existing name default failed'
+$状态=State
+foreach ($答案 in @('owner/repo','','new-admin','new-admin','')) { $script:回答.Enqueue($答案) }
+$首次计划=输入首次部署计划 $状态
+Assert ($首次计划.deployment_configs.production.env_vars.ADMIN.value -ceq 'new-admin') 'Initial password missing'
+Assert (-not $首次计划.deployment_configs.production.env_vars.CLOUDFLARE_API_TOKEN) 'Deploy token leaked into runtime'
+Assert ($首次计划.source.config.preview_deployment_setting -eq 'none') 'Preview must not share production storage'
+Assert ($首次计划.build_config.build_command -eq 'node scripts/prepare-pages.cjs') 'Wrong build command'
+$状态.plan=$首次计划; $状态.oldId=$null; $状态.phase='initializing'; $状态.domains=@(); $script:远端=$null
+保存部署状态 $文件 $状态
+$删除数=@($script:请求 | Where-Object { $_ -like 'DELETE *' }).Count
+执行重建 $状态 $文件
+Assert ($状态.phase -eq 'complete') 'Initial deploy did not complete'
+Assert ($script:远端.deployment_configs.production.kv_namespaces.KV.namespace_id -eq ('f'*32)) 'Initial native KV not bound'
+Assert (@($script:请求 | Where-Object { $_ -like 'DELETE *' }).Count -eq $删除数) 'Initial deployment deleted a project'
+$状态.phase='initializing'
+Throws { 执行重建 $状态 $文件 } '同名项目已存在'
+
+$script:远端=$null; $状态.kvId=''; $script:命名空间=@(); $script:丢失KV响应=$true
+保存部署状态 $文件 $状态
+Throws { 执行重建 $状态 $文件 } 'lost KV response'
+$KV创建数=@($script:请求 | Where-Object { $_ -like 'POST */storage/kv/namespaces' }).Count
+执行重建 (读取部署状态 $文件) $文件
+Assert (@($script:请求 | Where-Object { $_ -like 'POST */storage/kv/namespaces' }).Count -eq $KV创建数) 'Lost response created another namespace'
+
+$状态.phase='initializing'; $状态.kvId=('b'*32); $script:远端=$null
+保存部署状态 $文件 $状态
+执行重建 $状态 $文件
+Assert ($状态.plan.deployment_configs.production.kv_namespaces.KV.namespace_id -eq ('b'*32)) 'Explicit existing KV replaced'
+Assert (@($script:请求 | Where-Object { $_ -like 'POST */storage/kv/namespaces' }).Count -eq $KV创建数) 'Explicit KV ID created new storage'
+
+$原应用数据=$env:LOCALAPPDATA
+try {
+    $env:LOCALAPPDATA=$临时目录
+    foreach ($答案 in @('1','demo',('a'*32),('x'*40))) { $script:回答.Enqueue($答案) }
+    Throws { 启动重建程序 } '同名项目已经存在'
+    $script:远端=$null
+    foreach ($答案 in @('2','demo',('a'*32),('x'*40))) { $script:回答.Enqueue($答案) }
+    Throws { 启动重建程序 } '找不到这个项目'
+    Assert (@($script:请求 | Where-Object { $_ -like 'DELETE *' }).Count -eq $删除数) 'Wrong mode caused deletion'
+    $文件=Join-Path $临时目录 'forkedgetunnel/PagesRedeploy/state.clixml'
+    foreach ($答案 in @('1','demo',('a'*32),('x'*40),'owner/repo','','first-password','first-password','','demo')) { $script:回答.Enqueue($答案) }
+    启动重建程序
+    Assert ((读取部署状态 $文件).phase -eq 'complete') 'Interactive initial flow did not finish'
+    Assert (@($script:请求 | Where-Object { $_ -like 'DELETE *' }).Count -eq $删除数) 'Interactive first deploy deleted project'
+    $首次ID=$script:远端.deployment_configs.production.kv_namespaces.KV.namespace_id
+    foreach ($答案 in @('2','','demo')) { $script:回答.Enqueue($答案) }
+    启动重建程序
+    Assert ($script:远端.deployment_configs.production.kv_namespaces.KV.namespace_id -eq $首次ID) 'Interactive repeat replaced storage'
+    Assert ($script:远端.deployment_configs.production.env_vars.ADMIN.value -ceq 'first-password') 'Interactive repeat lost cached password'
+    Assert ($script:回答.Count -eq 0) 'Unused interactive answers'
+} finally { $env:LOCALAPPDATA=$原应用数据 }
+Assert (@($script:请求 | Where-Object { $_ -like 'DELETE *' }).Count -eq ($删除数+1)) 'Repeat should delete exactly once'
+Write-Host 'PASS: first/repeat selection, name validation, native KV initialization/reuse, encrypted backup and interrupted recovery.'

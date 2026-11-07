@@ -7,6 +7,13 @@ GNU General Public License, version 2.
 
 # 开发记录
 
+## 部署脚本增加初次/再次选择与项目名提示（2026-11-07）
+
+- 用户要求输入 1 初次、输入 2 再次，并在项目名处给正确/错误示例。入口加入选择菜单及重输校验：名称仅接受小写字母、数字、短横线，展示 `my-tunnel` 与完整 URL、pages.dev 域名、中文等常见误填；再次可回车沿用已保存名称。选初次遇到已有项目、选再次找不到项目时停止，不隐式转换为删除操作。
+- 初次流程补齐 GitHub 用户/仓库、分支（默认 main）、两次 ADMIN 密码和可选原 KV ID；使用当前构建脚本，API 创建时携带原生 KV 绑定。无 ID 时按项目专用固定标题查找或创建 KV；已有 ID 始终复用。初次创建需 Pages 编辑 + KV 编辑，部署 Token 只保存在本机，不写进 Worker；GitHub 仓库访问仍须由用户在 Cloudflare 授权，脚本不代替授权。默认关闭预览部署，不把生产 KV 随意共享给预览。
+- 增加 initializing/creating 阶段，准备存储前先保存加密计划，KV 创建响应丢失后按固定标题找回；复用原来的项目创建、绑定校验、构建等待与恢复逻辑。未完成记录优先恢复，不出现可覆盖记录的 1/2 菜单。再次部署保留原有删除确认与 KV 保护，不调用 KV 创建或删除。旧版本的 complete/failed/prepared/deleted/created 记录继续支持。
+- Windows PowerShell 5.1 回归增加菜单无效输入、URL/域名/大写/下划线/中文拒绝、默认项目名、初次计划字段、首次创建与原 ID 复用、KV 响应丢失恢复、选择与远端状态不一致时不删除；原有重建和 DPAPI 回归继续通过。同步 README 和详细教程，保留此前“模拟 API 不等于线上账号验收”的边界。本轮不修改 Worker、不构建 APK、不执行真实 Cloudflare 创建或删除。
+
 ## Windows Pages 删除重建部署（2026-11-07）
 
 - 用户明确要求按其项目实际操作方式自动“删除原 Pages 项目后重建”，不采用重新触发原项目的部署挂钩。新增 `redeploy-pages.cmd` 与 Windows PowerShell 5.1 脚本，使用 Cloudflare API 保留 GitHub 来源、构建设置、生产/预览变量、原 KV 绑定和自定义域名关联，然后构建原生产分支；不需要本机 Node、Git 或 Wrangler。首次创建项目仍沿用现有 README，不手动删除旧项目后再运行脚本。

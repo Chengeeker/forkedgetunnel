@@ -1,16 +1,54 @@
-# Windows 删除重建 Pages 脚本
+# Windows 初次 / 再次部署 Pages 脚本
 
-用于本项目需要“删除原 Pages 项目后重新部署”的使用方式。首次部署仍按 [README](../README.md#pages-github-setup) 完成；**保留现有项目，让脚本读取配置，不要先手动删掉。**
+双击根目录的 **`redeploy-pages.cmd`**，先选择：
 
-以后运行根目录的 **`redeploy-pages.cmd`**：脚本读取原配置 → 核验原 KV → 保存本地加密备份 → 确认目标 → 删除 Pages 项目 → 重建同名 GitHub 项目 → 恢复配置和域名关联 → 构建生产分支并等待结果。构建在 Cloudflare 执行，电脑不需要安装 Git、Node.js 或 Wrangler。
+```text
+1：初次部署（创建新项目）
+2：再次部署（保留 KV，删除并重建已有项目）
+```
+
+选 1 会创建新 Pages 项目，自动创建/复用 KV 并绑定；选 2 会先备份原配置，再删除并重建同名项目。**再次部署不要提前手动删除项目。** 选 1 却发现同名项目，或选 2 却找不到项目时，都会停止并提示，不会擅自切换模式。发现未完成的操作时优先恢复，不重新选择，避免丢失恢复记录。
+
+构建在 Cloudflare 执行，电脑不需要安装 Git、Node.js 或 Wrangler。也可以继续使用 [README 的控制台首次部署教程](../README.md#pages-github-setup)。
+
+## 项目名称应该填什么
+
+例如控制台中的项目名称是 **`my-tunnel`**，就只填 **`my-tunnel`**。
+
+| 输入 | 是否正确 |
+| --- | --- |
+| `my-tunnel` | 正确：小写字母、数字和短横线，最长 58 位 |
+| `https://my-tunnel.pages.dev/admin` | 错误：这是完整网址 |
+| `my-tunnel.pages.dev` | 错误：这是域名 |
+| `My_Tunnel`、`我的项目` | 错误：不能使用大写、下划线或中文 |
+
+初次部署时自己起名；再次部署时看 **Cloudflare → Workers & Pages** 中原项目的名称。它不一定与 GitHub 仓库名相同。格式错误时脚本会提示重新输入；再次部署可直接回车使用本机保存的项目名。
 
 ## 第一次运行
 
 1. [下载当前仓库 ZIP](https://github.com/Chengeeker/forkedgetunnel/archive/refs/heads/main.zip)，完整解压。不要只下载 `.cmd`，它需要同目录的 `scripts/redeploy-pages.ps1`。
-2. 为部署脚本准备一个 API Token。按 [新版 Token 创建教程](../README.md#kv-api-token) 进入账号策略，限定到项目所属账号，勾选 **Cloudflare Pages → 编辑** 和 **Workers KV 存储 → 读取**。英文名称为 `Cloudflare Pages → Edit`、`Workers KV Storage → Read`。如果已有同账号 KV 编辑权限，也包含所需读取权限。
-3. 双击 `redeploy-pages.cmd`，按提示填写 **Account ID、现有 Pages 项目名、部署 Token**。项目名填控制台名称，例如 `my-tunnel`，不要填写网址。
-4. 脚本逐个提示 Cloudflare 中的加密变量，例如生产环境的 `ADMIN`、`CLOUDFLARE_API_TOKEN`。填写它们的**原值**，输入不会明文回显。这些值无法从 Cloudflare 可靠读回；没有原值时直接回车停止，原项目不会删除。普通变量和原生 KV 绑定自动读取。
-5. 检查显示的项目、GitHub 仓库、分支、KV ID。输入项目名确认后自动执行余下操作。确认前已检查原 KV 存在，删除前必须成功保存并读回加密备份。
+2. 为部署脚本准备 API Token。按 [新版 Token 创建教程](../README.md#kv-api-token) 进入账号策略，限定到目标账号。**初次部署需要 Cloudflare Pages → 编辑，以及 Workers KV 存储 → 编辑**，用于创建 KV；再次部署只需 Pages 编辑和 KV 读取（已有 KV 编辑权限也可）。英文对应 `Cloudflare Pages → Edit`、`Workers KV Storage → Edit / Read`。
+3. 双击脚本，选择 **1 或 2**，按提示填写项目名、Account ID 和部署 Token。已有本地配置时沿用原账号和 Token。
+4. 根据下述初次/再次流程补齐信息，检查目标后输入项目名确认，随后自动执行并等待部署结果。
+
+### 选择 1：初次部署
+
+先确保自己的 fork 仓库已在 Cloudflare 的 GitHub 应用授权范围内。首次连接 GitHub 需在 Cloudflare 控制台完成授权；API Token 不能代替 GitHub 授权，脚本不会替你登录 GitHub。
+
+脚本接着询问：
+
+- **GitHub 用户名/仓库名**：例如 `your-name/forkedgetunnel`，不要填完整网址；使用包含本 fork 代码和构建脚本的仓库。
+- **部署分支**：一般直接回车使用 `main`。
+- **后台 ADMIN 密码**：输入两次确认，以加密变量写入新项目。
+- **原 KV 命名空间 ID**：有旧数据时填写原 ID；没有则回车，脚本按固定名称 `forkedgetunnel-项目名-production-KV` 查找，存在则复用，不存在才创建。
+
+脚本在创建 Pages 项目时直接提供名称为 `KV` 的原生绑定，无需再去控制台补绑，也无需把部署 Token 放进 Worker 的环境变量。新项目默认只开启生产分支部署，避免预览环境与生产配置混用。自定义域名可在首次成功后按 README 添加。
+
+### 选择 2：再次部署
+
+脚本读取原配置，逐个询问尚无本地备份的加密变量，例如 `ADMIN`、运行时 `CLOUDFLARE_API_TOKEN`。填写它们的**原值**；输入不明文回显。这些值无法从 Cloudflare 可靠读回，没有原值时直接回车停止，原项目不会删除。普通变量、原生 KV 绑定、GitHub 来源和构建设置自动读取。
+
+确认前检查原 KV 存在；删除前成功保存并读回加密备份，再删除项目、重建、恢复配置/域名关联和部署代码。再次部署不会创建或删除 KV。
 
 部署 Token 与 Worker 中用于读写 KV 的 `CLOUDFLARE_API_TOKEN` 用途不同：前者只保存在本机，不会写进项目环境变量；后者继续恢复为原值。原有仅 KV 编辑权限的 Token 不能管理 Pages，需另建部署 Token 或为它添加 Pages 编辑权限。
 
@@ -18,7 +56,7 @@
 
 先把代码更新到 **Pages 原来关联的 GitHub 仓库及生产分支**。如果你关联的是自己的 fork，需要先将新代码同步到自己的仓库；脚本不会修改 GitHub 仓库，也不会上传电脑上的未提交代码。
 
-双击 `redeploy-pages.cmd`，检查目标并输入项目名确认即可。账号、Token 和已备份的密钥无需重复填写；生产/预览的普通变量、原生 KV ID、构建设置、GitHub 来源会重新读取并恢复。仅通过 `KV_NAMESPACE_NAME` 访问存储时，脚本会查找原命名空间并固定其 ID；找不到或存在歧义时停止，不另建一份空 KV。
+双击 `redeploy-pages.cmd`，选择 **2**，回车沿用原项目名，再检查目标并确认即可。账号、Token 和已备份的密钥无需重复填写；生产/预览的普通变量、原生 KV ID、构建设置、GitHub 来源会重新读取并恢复。仅通过 `KV_NAMESPACE_NAME` 访问存储时，脚本会查找原命名空间并固定其 ID；找不到或存在歧义时停止，不另建一份空 KV。
 
 如果你在 Cloudflare 控制台改过加密变量，脚本无法识别被隐藏的新值，**下次重建前必须刷新本地备份**。在仓库目录打开 PowerShell 执行：
 
@@ -30,9 +68,10 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\redeploy-pages
 
 ## 备份与中断恢复
 
-状态及每次重建前的备份位于 `%LOCALAPPDATA%\forkedgetunnel\PagesRedeploy`，使用 Windows DPAPI 加密，只有原电脑、原 Windows 用户能够解密。脚本不会把明文 Token、密码或项目配置写进仓库，也不会调用 KV 删除、创建或键值写入接口。**这是项目配置备份，不是 KV 数据快照；原 KV 及其内容保留在 Cloudflare。**
+状态及每次重建前的备份位于 `%LOCALAPPDATA%\forkedgetunnel\PagesRedeploy`，使用 Windows DPAPI 加密，只有原电脑、原 Windows 用户能够解密。脚本不会把明文 Token、密码或项目配置写进仓库，不调用 KV 删除或键值写入接口；仅初次部署且无匹配原存储时创建 KV。**这是项目配置备份，不是 KV 数据快照；原 KV 及其内容保留在 Cloudflare。**
 
 - 断网、关闭窗口或创建失败：再次运行普通入口，从记录的步骤恢复；已确认的新项目不会被重复删除。
+- 初次创建 KV 后中断：再次运行按固定名称找回原 ID，继续创建项目，不重复新建存储。权限不足时可用 `refresh-pages-token.cmd` 更换 Token 后继续。
 - 创建请求可能成功但响应丢失：脚本显示发现的新项目 ID，需在控制台核对并输入这个 ID 后继续；不会直接删除这个项目。
 - 构建失败：在 Pages 查看构建日志，修复原 GitHub 分支或构建配置，再运行脚本。会重新展示删除重建确认，不把失败当成部署成功。
 - 等待超过 15 分钟：保留状态，下一次继续检查该部署。
@@ -40,14 +79,14 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\redeploy-pages
 
 当前保存一组账号/项目配置。请保留整个备份目录；换电脑需要重新提供密钥，不能把加密文件当作跨电脑密码备份。
 
-## 重建范围与影响
+## 适用范围与重建影响
 
-适用于已经关联 GitHub、使用本 README 的原生 KV 或同账号 KV API 存储的 Pages 项目。遇到 D1、R2、Durable Objects、Wrangler 配置托管等未支持的非空配置时，在删除前停止，避免丢失绑定。
+两种模式均使用已获 Cloudflare 授权的 GitHub 仓库。初次自动配置原生 KV；再次部署兼容原生 KV 或本 README 的同账号 KV API 存储。遇到 D1、R2、Durable Objects、Wrangler 配置托管等未支持的非空配置时，在删除前停止，避免丢失绑定。
 
 删除重建会中断服务，并丢失旧部署历史、旧预览链接和部署挂钩；新项目 ID 会改变。脚本恢复 GitHub 来源、生产分支、构建设置、生产/预览变量、KV 绑定和自定义域名关联。Access、项目外的策略和其他服务集成不在自动恢复范围内，使用这些配置的项目应先另行核对恢复办法。
 
 自定义域名重新关联后，DNS / 证书可能需要等待或在控制台处理；脚本不改 DNS 记录，不承诺无中断切换或一定立即释放同名项目。必须等到部署阶段返回成功才会显示“部署完成”；这也不代替实际代理连接验证。
 
-本地回归覆盖 Windows PowerShell 5.1、加密备份、密钥恢复、KV ID 保留、删除/创建中断恢复、域名恢复和失败部署。尚未在真实 Cloudflare 账号上执行删除重建验收。
+本地回归覆盖 Windows PowerShell 5.1、1/2 选择、项目名格式、选错模式不修改项目、首次 KV 创建/复用及中断恢复，并继续覆盖加密备份、密钥恢复、KV ID 保留、删除/创建中断恢复、域名恢复和失败部署。尚未在真实 Cloudflare 账号上执行首次创建或删除重建验收。
 
 接口依据：[项目创建](https://developers.cloudflare.com/api/resources/pages/subresources/projects/methods/create/)、[项目删除](https://developers.cloudflare.com/api/resources/pages/subresources/projects/methods/delete/)、[Git 分支部署](https://developers.cloudflare.com/api/resources/pages/subresources/projects/subresources/deployments/methods/create/)、[域名关联](https://developers.cloudflare.com/api/resources/pages/subresources/projects/subresources/domains/methods/create/)。加密方式见 [Microsoft Export-Clixml 说明](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.utility/export-clixml?view=powershell-5.1)。
