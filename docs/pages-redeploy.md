@@ -54,7 +54,7 @@
 
 脚本读取原配置，逐个询问尚无本地备份的加密变量，例如 `ADMIN`、运行时 `CLOUDFLARE_API_TOKEN`。填写它们的**原值**；输入不明文回显。这些值无法从 Cloudflare 可靠读回，没有原值时直接回车停止，原项目不会删除。普通变量、原生 KV 绑定、GitHub 来源和构建设置自动读取。
 
-确认前检查原 KV 存在；删除前成功保存并读回加密备份，再删除项目、重建、恢复配置/域名关联和部署代码。再次部署不会创建或删除 KV。
+确认前检查原 KV 存在；删除前成功保存并读回加密备份。随后列出并备份当前自定义域名，先解除域名关联，再删除项目、重建、恢复配置/域名关联和部署代码。再次部署不会创建或删除 KV；脚本不调用 DNS 记录修改接口。
 
 部署 Token 与 Worker 中用于读写 KV 的 `CLOUDFLARE_API_TOKEN` 用途不同：前者只保存在本机，不会写进项目环境变量；后者继续恢复为原值。原有仅 KV 编辑权限的 Token 不能管理 Pages，需另建部署 Token 或为它添加 Pages 编辑权限。
 
@@ -85,11 +85,26 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\redeploy-pages
 
 `403 / 10000` 本身不足以判定上述哪一项有误；新版错误会标明是 Pages 还是 KV 接口失败，不显示敏感响应。若明确提示“KV ID 格式不正确”，才检查原命名空间 ID 是否为 32 位十六进制字符串。旧版本还存在将 `kv_namespaces: null` 当成一个空 ID 的误判，本版已修复，未设置原生绑定时会正常检查运行时 KV 配置。
 
+<a id="pages-domain-delete-error"></a>
+
+## 删除项目时报 400 / 8000028
+
+这表示 Cloudflare 仍检测到项目的自定义域名关联，需要先解除关联才能删除项目。旧脚本漏了这一步，只备份域名并安排重建后恢复，因此会在这里停止；无需为此更换 KV ID 或重新创建命名空间。
+
+1. [重新下载最新版 ZIP](https://github.com/Chengeeker/forkedgetunnel/archive/refs/heads/main.zip) 并完整解压，在原电脑、原 Windows 用户下双击 `redeploy-pages.cmd`。
+2. 脚本读取本机已有的 `prepared` 恢复记录，自动继续：备份当前域名列表、解除关联、删除重建、恢复原域名。此时不再显示初次/再次选择菜单。
+3. 不要提前手动删除项目，也不要清空 `%LOCALAPPDATA%\forkedgetunnel\PagesRedeploy`；其中保存了恢复配置所需的加密数据。
+
+域名解除失败会立即停止，不继续删除项目；解除成功但响应丢失时，重新运行会读取剩余关联，保留备份里的全部原域名并在重建后恢复。解除期间自定义域名会暂时不可用，重建后证书也可能需要等待。脚本只调用 Pages 的域名关联接口，不调用 DNS 记录删除接口；使用原有 Pages 编辑权限即可。[域名解除接口说明](https://developers.cloudflare.com/api/resources/pages/subresources/projects/subresources/domains/methods/delete/)
+
+若控制台和 API 的自定义域名列表都已为空，仍出现 `8000028`，脚本会保留恢复记录并停止；此时应核对 Cloudflare 的关联状态、稍后重试或联系支持，不能通过删除 KV 来解决。
+
 ## 备份与中断恢复
 
 状态及每次重建前的备份位于 `%LOCALAPPDATA%\forkedgetunnel\PagesRedeploy`，使用 Windows DPAPI 加密，只有原电脑、原 Windows 用户能够解密。脚本不会把明文 Token、密码或项目配置写进仓库，不调用 KV 删除或键值写入接口；仅初次部署且无匹配原存储时创建 KV。**这是项目配置备份，不是 KV 数据快照；原 KV 及其内容保留在 Cloudflare。**
 
 - 断网、关闭窗口或创建失败：再次运行普通入口，从记录的步骤恢复；已确认的新项目不会被重复删除。
+- 解除部分自定义域名后中断：再次运行仅处理仍关联的域名，重建后恢复备份中的全部原域名。
 - 初次创建 KV 后中断：再次运行按固定名称找回原 ID，继续创建项目，不重复新建存储。权限不足时可用 `refresh-pages-token.cmd` 更换 Token 后继续。
 - 创建请求可能成功但响应丢失：脚本显示发现的新项目 ID，需在控制台核对并输入这个 ID 后继续；不会直接删除这个项目。
 - 构建失败：在 Pages 查看构建日志，修复原 GitHub 分支或构建配置，再运行脚本。会重新展示删除重建确认，不把失败当成部署成功。
@@ -106,6 +121,6 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\redeploy-pages
 
 自定义域名重新关联后，DNS / 证书可能需要等待或在控制台处理；脚本不改 DNS 记录，不承诺无中断切换或一定立即释放同名项目。必须等到部署阶段返回成功才会显示“部署完成”；这也不代替实际代理连接验证。
 
-本地回归覆盖 Windows PowerShell 5.1、1/2 选择、项目名格式、选错模式不修改项目、首次 KV 创建/复用及中断恢复，并继续覆盖加密备份、密钥恢复、KV ID 保留、删除/创建中断恢复、域名恢复和失败部署。尚未在真实 Cloudflare 账号上执行首次创建或删除重建验收。
+本地回归覆盖 Windows PowerShell 5.1、1/2 选择、项目名格式、选错模式不修改项目、首次 KV 创建/复用及中断恢复，并继续覆盖加密备份、密钥恢复、KV ID 保留、删除/创建中断恢复、域名先解除后恢复、解除失败/响应丢失、删除范围限制和失败部署。尚未在真实 Cloudflare 账号上执行首次创建或删除重建验收。
 
-接口依据：[项目创建](https://developers.cloudflare.com/api/resources/pages/subresources/projects/methods/create/)、[项目删除](https://developers.cloudflare.com/api/resources/pages/subresources/projects/methods/delete/)、[Git 分支部署](https://developers.cloudflare.com/api/resources/pages/subresources/projects/subresources/deployments/methods/create/)、[域名关联](https://developers.cloudflare.com/api/resources/pages/subresources/projects/subresources/domains/methods/create/)。加密方式见 [Microsoft Export-Clixml 说明](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.utility/export-clixml?view=powershell-5.1)。
+接口依据：[项目创建](https://developers.cloudflare.com/api/resources/pages/subresources/projects/methods/create/)、[项目删除](https://developers.cloudflare.com/api/resources/pages/subresources/projects/methods/delete/)、[Git 分支部署](https://developers.cloudflare.com/api/resources/pages/subresources/projects/subresources/deployments/methods/create/)、[列出域名](https://developers.cloudflare.com/api/resources/pages/subresources/projects/subresources/domains/methods/list/)、[解除域名](https://developers.cloudflare.com/api/resources/pages/subresources/projects/subresources/domains/methods/delete/)、[域名关联](https://developers.cloudflare.com/api/resources/pages/subresources/projects/subresources/domains/methods/create/)。加密方式见 [Microsoft Export-Clixml 说明](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.utility/export-clixml?view=powershell-5.1)。

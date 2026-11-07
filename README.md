@@ -30,7 +30,7 @@ The independent local-cfdata launcher uses GPL-3.0-or-later; see its LICENSE.
 2. [首次使用与订阅](#first-use)：确认保存成功，选择订阅模式，再导入客户端。
 3. [在线优选 IP / 域名](#online-optimize) 或 [Windows 本地优选](#windows-cfdata)：测试后使用自定义订阅模式保存结果。
 4. 需要调整配置时查看 [环境变量](#environment-variables)、[升级与排错](#maintenance)。
-5. 也可使用 [Windows 部署脚本](./docs/pages-redeploy.md)：输入 **1 初次部署**，自动准备原生 KV 并创建项目；输入 **2 再次部署**，保留原 KV，备份配置后删除重建。
+5. 也可使用 [Windows 部署脚本](./docs/pages-redeploy.md)：输入 **1 初次部署**，自动准备原生 KV 并创建项目；输入 **2 再次部署**，保留原 KV，备份配置并解除自定义域名关联后删除重建，再恢复原域名。旧版遇到 `8000028` 时，按 [恢复说明](./docs/pages-redeploy.md#pages-domain-delete-error) 更新脚本后继续。
 
 **已经部署且只填了 `ADMIN` 的项目，请按 [已有项目补救步骤](#existing-pages-recovery) 操作。** 旧部署补变量后仍需一次新部署；首次填齐的项目无需补绑再部署。
 

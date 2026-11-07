@@ -24,6 +24,14 @@ function 生成接口错误([string]$方法, [string]$路径, [int]$状态码, $
         if ($方法 -eq 'DELETE') { $操作 = '删除 Pages 项目' }
         if ($方法 -eq 'POST' -and $路径.EndsWith('/pages/projects')) { $操作 = '创建 Pages 项目' }
         if ($路径 -match '/deployments') { $操作 = 'Pages 部署请求' }
+        if ($路径 -match '/domains') { $操作 = if ($方法 -eq 'DELETE') { '解除 Pages 自定义域名关联' } else { 'Pages 自定义域名请求' } }
+        if ($方法 -eq 'DELETE' -and $状态码 -eq 400 -and $代码 -contains 8000028) {
+            $提示 = @(
+                'Cloudflare 仍检测到自定义域名关联，需先解除关联才能删除项目；这不是 KV ID 错误。'
+                '加密恢复记录已保留，请使用最新版脚本再次运行；它会先解除关联，重建后恢复。'
+                '若自定义域名列表已为空仍报此错，请在控制台核对关联状态或联系 Cloudflare；不要删除 KV 或本机备份。'
+            )
+        }
         if ($状态码 -in @(401,403)) {
             $提示 = @(
                 'Pages 接口拒绝了当前 Token；这不是 KV ID 格式错误。'
@@ -59,12 +67,21 @@ function 读取部署状态($路径) {
     catch { throw '无法读取本地加密备份。请使用原 Windows 用户和电脑，不要删除备份后重试。' }
 }
 
+function 检查删除范围($状态, [string]$路径) {
+    $项目路径 = "/accounts/$($状态.account)/pages/projects/$($状态.name)"
+    if ($路径 -ceq $项目路径) { return }
+    foreach ($域名 in $状态.domains) {
+        if ($状态.phase -ne 'prepared' -or [Uri]::CheckHostName($域名) -ne [UriHostNameType]::Dns -or $域名 -notmatch '\.' -or $域名 -like '*.pages.dev') { continue }
+        if ($路径 -ceq "$项目路径/domains/$([Uri]::EscapeDataString($域名))") { return }
+    }
+    throw '禁止删除目标项目及恢复记录中的自定义域名关联之外的资源。'
+}
+
 function 调用CF接口($状态, [string]$方法, [string]$路径, $内容 = $null, [switch]$表单) {
     if ($状态.account -notmatch '^[a-fA-F0-9]{32}$' -or $状态.name -notmatch '^[a-z0-9][a-z0-9-]{0,57}$') { throw '账号 ID 或项目名格式不正确。' }
     if ($状态.token -notmatch '^[A-Za-z0-9_-]{20,256}$') { throw '部署 Token 格式不正确。' }
-    $项目前缀 = "/accounts/$($状态.account)/pages/projects"
     if (-not $路径.StartsWith("/accounts/$($状态.account)/")) { throw '接口账号不匹配。' }
-    if ($方法 -eq 'DELETE' -and $路径 -cne "$项目前缀/$($状态.name)") { throw '禁止删除项目之外的资源。' }
+    if ($方法 -eq 'DELETE') { 检查删除范围 $状态 $路径 }
     if ($方法 -notin @('GET', 'POST', 'DELETE')) { throw '不支持的接口操作。' }
     Add-Type -AssemblyName System.Net.Http
     $处理器 = [Net.Http.HttpClientHandler]::new()
@@ -304,7 +321,27 @@ function 执行重建($状态, $状态路径) {
     }
     if ($状态.phase -eq 'prepared') {
         if ($当前 -and $当前.id -ne $状态.oldId) { throw '同名项目 ID 已变化，停止删除。' }
-        if ($当前) { $null = 调用CF接口 $状态 DELETE $接口 }
+        if ($当前) {
+            $当前域名 = @()
+            foreach ($关联 in @(调用CF接口 $状态 GET "$接口/domains")) {
+                if (-not $关联) { continue }
+                if (-not $关联.name) { throw '自定义域名列表格式异常，停止删除。' }
+                $当前域名 += [string]$关联.name
+            }
+            # Keep already detached names in the backup when resuming a partial attempt.
+            $状态.domains = @((@($状态.domains) + $当前域名) | Where-Object { $_ } | Sort-Object -Unique)
+            foreach ($域名 in $状态.domains) { 检查删除范围 $状态 "$接口/domains/$([Uri]::EscapeDataString($域名))" }
+            保存部署状态 $状态路径 $状态
+            foreach ($域名 in $当前域名) {
+                $当前 = 获取现有项目 $状态
+                if (-not $当前 -or $当前.id -ne $状态.oldId) { throw '同名项目 ID 已变化，停止解除域名关联。' }
+                Write-Host "暂时解除自定义域名关联：$域名（重建后恢复）"
+                $null = 调用CF接口 $状态 DELETE "$接口/domains/$([Uri]::EscapeDataString($域名))"
+            }
+            $当前 = 获取现有项目 $状态
+            if ($当前 -and $当前.id -ne $状态.oldId) { throw '同名项目 ID 已变化，停止删除。' }
+            if ($当前) { $null = 调用CF接口 $状态 DELETE $接口 }
+        }
         $状态.phase = 'deleted'
         保存部署状态 $状态路径 $状态
         $当前 = $null
@@ -407,7 +444,7 @@ function 启动重建程序 {
         Write-Host "GitHub 来源：$($计划.source.config.owner)/$($计划.source.config.repo_name)，分支：$($计划.production_branch)"
         Write-Host "保留 KV：$($存储列表 -join ', ')"
         Write-Host '即将删除并重建同名 Pages 项目。期间服务中断，旧部署历史和部署挂钩不会保留。'
-        Write-Host '自定义域名会重新关联，DNS 记录不改动，证书可能需要等待重新签发。'
+        Write-Host '自定义域名会先解除关联，重建后恢复；不调用 DNS 记录修改接口，证书可能需要等待重新签发。'
         Write-Host '恢复范围为下述 Git 构建、环境变量、KV 与域名关联；Access 等项目外策略需另行核对。'
         if ((读取部署输入 '确认继续请输入项目名；其他输入取消') -cne $状态.name) { Write-Host '已取消，原项目未删除。'; return }
         $状态.plan = $计划; $状态.domains = @($项目.domains | Where-Object { $_ -notlike '*.pages.dev' })

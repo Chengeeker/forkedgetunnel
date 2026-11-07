@@ -40,6 +40,20 @@ Assert (-not $权限错误.Message.Contains('secret-response') -and -not $权限
 $KV权限错误 = 生成接口错误 GET "/accounts/$('a'*32)/storage/kv/namespaces" 403 @(10000)
 Assert ($KV权限错误.Message.Contains('KV 读取权限') -and -not $KV权限错误.Message.Contains('Pages 编辑')) 'KV permission guidance is wrong'
 Assert ((生成接口错误 GET '/accounts/example/pages/projects/demo' 404 @(8000007)).Data['status'] -eq 404) 'Not-found status was lost'
+$域名错误 = 生成接口错误 DELETE '/accounts/example/pages/projects/demo' 400 @(8000028)
+Assert ($域名错误.Message.Contains('需先解除关联') -and -not $域名错误.Message.Contains('检查对应接口的权限')) 'Custom domain prerequisite was hidden'
+Assert ((生成接口错误 DELETE '/accounts/example/pages/projects/demo/domains/demo.example.com' 403 @(10000)).Message.Contains('解除 Pages 自定义域名关联')) 'Domain request misclassified as project deletion'
+$范围状态=State
+$项目路径="/accounts/$($范围状态.account)/pages/projects/demo"
+检查删除范围 $范围状态 $项目路径
+检查删除范围 $范围状态 "$项目路径/domains/demo.example.com"
+foreach ($拒绝路径 in @("$项目路径/domains/other.example.com", "$项目路径/domains/demo.pages.dev", "$项目路径/deployments/example", "$项目路径/domains/demo.example.com?force=true", "$项目路径/domains/demo.example.com/../other.example.com", "/accounts/$($范围状态.account)/pages/projects/other/domains/demo.example.com")) {
+    Throws { 检查删除范围 $范围状态 $拒绝路径 } '禁止删除'
+}
+$范围状态.domains=@('../escape.example.com')
+Throws { 检查删除范围 $范围状态 "$项目路径/domains/..%2Fescape.example.com" } '禁止删除'
+$范围状态=State; $范围状态.phase='created'
+Throws { 检查删除范围 $范围状态 "$项目路径/domains/demo.example.com" } '禁止删除'
 $项目 = Project
 $项目.deployment_configs.production | Add-Member d1_databases @{DB=@{id='existing'}}
 Throws { 生成重建计划 $项目 } '未支持'
@@ -67,6 +81,9 @@ $script:拒绝创建 = $false
 $script:丢失删除响应 = $false
 $script:部署失败 = $false
 $script:拒绝Pages = $false
+$script:拒绝域名 = $false
+$script:丢失域名响应 = $false
+$script:读取域名后替换项目 = $false
 $script:命名空间 = @([pscustomobject]@{id=('b'*32); title='stable-KV'})
 $script:丢失KV响应 = $false
 function 调用CF接口 {
@@ -85,9 +102,28 @@ function 调用CF接口 {
         if ($script:拒绝Pages) { throw (生成接口错误 $方法 $路径 403 @(10000)) }
         return $script:远端
     }
+    if ($方法 -eq 'GET' -and $路径 -eq "$基础/domains") {
+        $列表=@($script:远端.domains | Where-Object { $_ -notlike '*.pages.dev' } | ForEach-Object { @{name=$_} })
+        if ($script:读取域名后替换项目) { $script:远端.id='unrelated-project' }
+        return $列表
+    }
+    if ($方法 -eq 'DELETE' -and $路径.StartsWith("$基础/domains/")) {
+        检查删除范围 $状态 $路径
+        $备份=读取部署状态 $文件
+        Assert ($备份.phase -eq 'prepared') 'Domain detached before encrypted backup'
+        foreach ($现有域名 in @($script:远端.domains | Where-Object { $_ -notlike '*.pages.dev' })) {
+            Assert ($现有域名 -in $备份.domains) 'Domain missing from saved recovery plan'
+        }
+        if ($script:拒绝域名) { throw (生成接口错误 $方法 $路径 403 @(10000)) }
+        $域名=[Uri]::UnescapeDataString($路径.Split('/')[-1])
+        $script:远端.domains=@($script:远端.domains | Where-Object { $_ -cne $域名 })
+        if ($script:丢失域名响应) { $script:丢失域名响应=$false; throw 'lost domain response' }
+        return $null
+    }
     if ($方法 -eq 'DELETE') {
         Assert ($路径 -eq $基础) 'Deleted non-project resource'
         Assert ((读取部署状态 $文件).phase -eq 'prepared') 'Delete happened before encrypted backup'
+        if (@($script:远端.domains | Where-Object { $_ -notlike '*.pages.dev' }).Count) { throw (生成接口错误 $方法 $路径 400 @(8000028)) }
         $script:远端=$null
         if ($script:丢失删除响应) { $script:丢失删除响应=$false; throw 'lost delete response' }
         return $null
@@ -136,7 +172,48 @@ $状态=State; $状态.plan=$缓存计划
 Assert ($状态.phase -eq 'complete') 'Rebuild did not complete'
 Assert ($script:远端.domains -contains 'demo.example.com') 'Custom domain not restored'
 Assert ($script:远端.deployment_configs.production.env_vars.ADMIN.value -eq 'original-admin') 'ADMIN not restored'
-Assert (@($script:请求 | Where-Object { $_ -like 'DELETE *' }).Count -eq 1) 'Unexpected deletes'
+Assert (@($script:请求 | Where-Object { $_ -like 'DELETE *' }).Count -eq 2) 'Expected one domain detach and one project delete'
+
+# The provider rejects project deletion while domains are attached; failed/uncertain detaches must resume safely.
+$状态=State; $状态.plan=$缓存计划; $script:远端=Project; $script:拒绝域名=$true
+保存部署状态 $文件 $状态
+$项目删除数=@($script:请求 | Where-Object { $_ -eq "DELETE $项目路径" }).Count
+Throws { 执行重建 $状态 $文件 } '解除 Pages 自定义域名关联'
+Assert ((读取部署状态 $文件).phase -eq 'prepared') 'Domain rejection lost prepared checkpoint'
+Assert ($script:远端.id -eq 'old-project' -and $script:远端.domains -contains 'demo.example.com') 'Domain rejection mutated project'
+Assert (@($script:请求 | Where-Object { $_ -eq "DELETE $项目路径" }).Count -eq $项目删除数) 'Project deletion continued after domain rejection'
+$script:拒绝域名=$false
+执行重建 (读取部署状态 $文件) $文件
+Assert ($script:远端.domains -contains 'demo.example.com') 'Domain rejection recovery lost domain'
+
+$状态=State; $状态.plan=$缓存计划; $script:远端=Project; $script:远端.domains += 'second.example.com'; $script:丢失域名响应=$true
+保存部署状态 $文件 $状态
+Throws { 执行重建 $状态 $文件 } 'lost domain response'
+$中断状态=读取部署状态 $文件
+Assert ($中断状态.phase -eq 'prepared' -and $中断状态.domains.Count -eq 2) 'Partial detach lost domain recovery set'
+Assert ($script:远端.id -eq 'old-project' -and $script:远端.domains -notcontains 'demo.example.com') 'Lost domain response not simulated'
+$已解除次数=@($script:请求 | Where-Object { $_ -eq "DELETE $项目路径/domains/demo.example.com" }).Count
+执行重建 $中断状态 $文件
+Assert (@($script:请求 | Where-Object { $_ -eq "DELETE $项目路径/domains/demo.example.com" }).Count -eq $已解除次数) 'Detached domain was deleted again'
+Assert ($script:远端.domains -contains 'demo.example.com' -and $script:远端.domains -contains 'second.example.com') 'Partial detach recovery lost a domain'
+
+$状态=State; $状态.plan=$缓存计划; $script:远端=Project; $script:读取域名后替换项目=$true
+保存部署状态 $文件 $状态
+$删除数=@($script:请求 | Where-Object { $_ -like 'DELETE *' }).Count
+Throws { 执行重建 $状态 $文件 } '停止解除域名关联'
+Assert (@($script:请求 | Where-Object { $_ -like 'DELETE *' }).Count -eq $删除数) 'Domain detach touched a replacement project'
+$script:读取域名后替换项目=$false
+
+$状态=State; $状态.plan=$缓存计划; $script:远端=Project; $script:远端.domains += '../escape.example.com'
+保存部署状态 $文件 $状态
+Throws { 执行重建 $状态 $文件 } '禁止删除'
+Assert (@($script:请求 | Where-Object { $_ -like 'DELETE *' }).Count -eq $删除数) 'Malformed domain caused partial deletion'
+
+$状态=State; $状态.plan=$缓存计划; $状态.domains=@($null); $script:远端=Project; $script:远端.domains=@('demo.pages.dev')
+保存部署状态 $文件 $状态
+执行重建 $状态 $文件
+Assert ($状态.phase -eq 'complete' -and $状态.domains.Count -eq 0) 'Empty legacy domain list failed recovery'
+Assert (@($script:请求 | Where-Object { $_ -like 'DELETE *' }).Count -eq ($删除数+1)) 'Empty domain list detached a domain'
 
 $状态=State; $状态.plan=$缓存计划; $script:远端=Project; $script:拒绝创建=$true
 保存部署状态 $文件 $状态
@@ -243,4 +320,4 @@ try {
     Assert ($script:回答.Count -eq 0) 'Unused interactive answers'
 } finally { $env:LOCALAPPDATA=$原应用数据 }
 Assert (@($script:请求 | Where-Object { $_ -like 'DELETE *' }).Count -eq ($删除数+1)) 'Repeat should delete exactly once'
-Write-Host 'PASS: first/repeat selection, name validation, native KV initialization/reuse, encrypted backup and interrupted recovery.'
+Write-Host 'PASS: first/repeat selection, KV reuse, encrypted backup, domain detach/restore, deletion boundaries and interrupted recovery.'
