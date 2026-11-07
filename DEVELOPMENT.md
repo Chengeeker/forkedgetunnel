@@ -7,6 +7,19 @@ GNU General Public License, version 2.
 
 # 开发记录
 
+## 在线优选失效恢复及域名输入（2026-11-07）
+
+- 用户反馈双栈均显示“不具备优选条件 / 线路不可用”，同时 IP 库消失。根因在于 `resolveBestHost` 直接信任 localStorage 中的旧域名，不验证或切换；`updateLibraryOptions` 又以线路检测结果过滤静态 IP 库，`updateActionAvailability` 禁用初筛按钮，导致外部服务失败后页面没有重试入口。复查既有“非 CN 仅警告”修复，没有恢复地区硬限制。
+- 在当前网络实测一个主服务 IPv4 地址超时，而备用服务地址可返回 HTTP 200 JSON；这只能证明当前采样路径的差异，不能推断主服务全球失效。旧 `cf.090227.xyz/ips-v4` 则返回 HTTP 200 的 HTML 网页而非网段文本。未将用户出口 IP、Token 或真实配置写入仓库。
+- 服务缓存现在只决定尝试顺序，每轮复用同一批真实双栈检测结果；缓存服务双栈失败后尝试备用服务，全部失败时清除缓存，保留失败状态，不重复执行选服务和测线路两批相同请求。IP 库独立显示，初筛按钮允许重新验证；失败提示改为“检测服务未连通”，不把第三方请求失败推断成本机线路失效。下载测速仍要求服务就绪。
+- 官方网段改用 2026-11-07 核对的内置 IPv4/IPv6 快照，来源为 `https://www.cloudflare.com/ips-v4` 和 `/ips-v6`，不再依赖失效的第三方路径。远程库返回空内容或 HTML 时拒绝覆盖输入框。官方发布范围改变时需更新快照；导入网段不等于已验证网段内所有 IP 可用。
+- 用户补充从 `bestcf.fxxk.dedyn.io` 带回域名结果测速和导入的需求。原 `prepareCandidates` / `normalizeAddress` 仅接受 IP，导致域名被忽略；增加共享域名规范化与解析，支持域名、域名:端口#备注和 IP 混合输入，校验 DNS 标签及端口。域名默认 443；固定端口设置仍生效。外站入口保留，用户复制后粘贴，不跨站读取数据或改变外部页面。
+- 域名使用固定 Cloudflare/Google JSON DNS 端点，不向 DNS 请求发送 Cookie 或管理凭据；并发查询 A/AAAA，失败切换供应方，运行内缓存 Promise，取消时停止派发。每域名最多交错尝试四个有效 IPv4/IPv6 地址，首个可测地址复用现有 IP 初筛、下载、排序和筛选流程。结果地址保留原域名，`parsed` 保存真正测量的 IP，避免速度测试误把域名编码成 IP 标签；类型标注“域名解析IP”。测量不是对原域名的 SNI/网页或完整代理连接验收，DNS 更新后出口可能变化。
+- 复用既有勾选 / 全选和 `saveSelectedResults` → `appendOnlineOptimizeSelections`，按钮改为“导入到优选列表”，追加域名及测速结果到 `customIPs` 并标记待保存，不直接覆盖或提交 KV。README 和输入提示同步格式、测量含义、操作顺序及内置库限制。
+- 新增 `tests/optimizer-network.test.cjs` 覆盖过期缓存切换、缓存重检、全部失败清缓存、无线路时库导入、HTML 拒绝、重试按钮；`tests/optimizer-domains.test.cjs` 覆盖混合输入与拒绝非法域名/端口、A/AAAA 与 IPv6 退路、DNS 缓存/备用/取消、下载目标保持已测 IP、原域名带测速结果导入。既有非 CN 警告、本地 Clash 和应用专用监听回归继续通过，内联脚本编译通过。Pages 资源准备及 Wrangler functions build 成功；本项目无 APK 构建目标。
+- 真实 Chrome 打开本地独立优选模板，验证备用服务完成 IPv4 检测、IPv6 请求失败仍可操作、内置库导入 15 行，以及一个可测域名的解析→初筛→下载→速度表头排序，输出保留域名及测量值。截图保存在忽略的 `tmp/optimizer-check/domain-speed.png`，未写入公开仓库；列表导入由离线回归验证，没有修改用户线上配置。另一个公开域名的解析 IP 被第三方服务返回 403，因此未得到可用结果；追加零结果时的具体错误提示，不能把“接受域名”描述成任何域名均可测试。浏览器通过不替代用户 Pages 线上部署、其他网络和完整代理连接验收。
+- DNS 请求头及 JSON 参数依据 [Cloudflare 文档](https://developers.cloudflare.com/1.1.1.1/encryption/dns-over-https/make-api-requests/dns-json/)和[Google 文档](https://developers.google.com/speed/public-dns/docs/doh/json)。后续若改成直接检测域名自身 trace/SNI，需单独实现和标注，不应把当前解析 IP 测量混称为原域名链路。
+
 ## 上游差异及 1101 更新核对（2026-11-07）
 
 - 在线读取 `cmliu/edgetunnel` 的 `refs/heads/main`，当前为 `a8ab11125ece9bc27983f609a6359be81b21050c`。本地 Git 确认它是当前分支祖先，`HEAD..a8ab111` 为 0 个提交，没有待同步的上游 main 提交；本轮只核对，没有进行合并。

@@ -7,7 +7,7 @@ const state = {networkChecking: false, results: [], selectedIds: new Set()};
 const context = {state, bootLoading: {active: false}, Map, Promise,
   rememberSelectedLibrary() {}, renderNetworkCard() {}, updateLibraryOptions() {}, updateActionAvailability() {},
   resetResultFilters() {}, renderResults() {}, setProgress() {}, loadLocations: async () => {}, updateServiceStatus() {},
-  resolveBestHost: async () => 'test', showNetworkWarning() { warnings++; },
+  resolveBestHost: async () => ({checks: await Promise.allSettled(['ipv4', 'ipv6'].map(family => context.detectStack(family)))}), showNetworkWarning() { warnings++; },
   detectStack: async family => { const country = countries[family === 'ipv4' ? 0 : 1]; if (!country) throw new Error('offline failure'); return {status: 'done', country, allowed: country === 'CN', ipType: family, ip: family === 'ipv4' ? '192.0.2.1' : '2001:db8::1'}; },
   els: {networkWarningOverlay: {classList: {remove() { closed = true; }}}, latencyBtn: {disabled: false, focus() {}}}, svgPulseIcon: () => ''};
 vm.createContext(context);
