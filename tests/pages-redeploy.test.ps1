@@ -33,6 +33,13 @@ $错误状态 = State
 Throws { 调用CF接口 $错误状态 DELETE "/accounts/$($错误状态.account)/storage/kv/namespaces/$('b'*32)" } '禁止删除'
 $错误状态.account='https://invalid.example'
 Throws { 调用CF接口 $错误状态 GET '/bad' } '格式不正确'
+$权限错误 = 生成接口错误 GET "/accounts/$('a'*32)/pages/projects/demo" 403 @(10000,'secret-response')
+Assert ($权限错误.Data['status'] -eq 403) 'HTTP status was lost'
+Assert ($权限错误.Message.Contains('读取 Pages 项目配置') -and $权限错误.Message.Contains('不是 KV ID 格式错误')) 'Pages failure misclassified as KV'
+Assert (-not $权限错误.Message.Contains('secret-response') -and -not $权限错误.Message.Contains(('a'*32))) 'API details leaked'
+$KV权限错误 = 生成接口错误 GET "/accounts/$('a'*32)/storage/kv/namespaces" 403 @(10000)
+Assert ($KV权限错误.Message.Contains('KV 读取权限') -and -not $KV权限错误.Message.Contains('Pages 编辑')) 'KV permission guidance is wrong'
+Assert ((生成接口错误 GET '/accounts/example/pages/projects/demo' 404 @(8000007)).Data['status'] -eq 404) 'Not-found status was lost'
 $项目 = Project
 $项目.deployment_configs.production | Add-Member d1_databases @{DB=@{id='existing'}}
 Throws { 生成重建计划 $项目 } '未支持'
@@ -59,6 +66,7 @@ $script:远端 = Project
 $script:拒绝创建 = $false
 $script:丢失删除响应 = $false
 $script:部署失败 = $false
+$script:拒绝Pages = $false
 $script:命名空间 = @([pscustomobject]@{id=('b'*32); title='stable-KV'})
 $script:丢失KV响应 = $false
 function 调用CF接口 {
@@ -73,7 +81,10 @@ function 调用CF接口 {
         return $新存储
     }
     if ($路径 -like '*/storage/kv/namespaces/*') { return @{id=$路径.Split('/')[-1]} }
-    if ($方法 -eq 'GET' -and $路径 -eq $基础) { return $script:远端 }
+    if ($方法 -eq 'GET' -and $路径 -eq $基础) {
+        if ($script:拒绝Pages) { throw (生成接口错误 $方法 $路径 403 @(10000)) }
+        return $script:远端
+    }
     if ($方法 -eq 'DELETE') {
         Assert ($路径 -eq $基础) 'Deleted non-project resource'
         Assert ((读取部署状态 $文件).phase -eq 'prepared') 'Delete happened before encrypted backup'
@@ -102,8 +113,22 @@ $项目.deployment_configs.production.env_vars | Add-Member KV_NAMESPACE_NAME @{
 $项目.deployment_configs.production.env_vars | Add-Member CLOUDFLARE_API_TOKEN @{type='secret_text';value='runtime-kv-token'}
 $null=检查原KV (State) $项目
 Assert ($项目.deployment_configs.production.env_vars.KV_NAMESPACE_ID.value -eq ('b'*32)) 'Runtime KV not pinned'
+$项目.deployment_configs.production.kv_namespaces=$null
+Assert (@(检查原KV (State) $项目).Count -eq 2) 'Null native KV treated as an invalid ID'
+$项目.deployment_configs.production.PSObject.Properties.Remove('kv_namespaces')
+Assert (@(检查原KV (State) $项目).Count -eq 2) 'Missing native KV treated as an invalid ID'
+$项目.deployment_configs.preview.kv_namespaces=$null
+Assert (@(检查原KV (State) $项目).Count -eq 1) 'Empty preview binding became an invalid ID'
+$畸形项目=Project
+$畸形项目.deployment_configs.production.kv_namespaces.KV.namespace_id=''
+Throws { 检查原KV (State) $畸形项目 } '缺少 namespace_id'
 $项目.deployment_configs.production.env_vars.CLOUDFLARE_ACCOUNT_ID.value=('d'*32)
 Throws { 检查原KV (State) $项目 } '不同'
+$script:拒绝Pages=$true
+$请求数=$script:请求.Count
+Throws { 获取现有项目 (State) } '读取 Pages 项目配置'
+Assert ($script:请求.Count -eq $请求数+1) 'Pages denial proceeded to KV or mutation'
+$script:拒绝Pages=$false
 
 $状态=State; $状态.plan=$缓存计划
 保存部署状态 $文件 $状态

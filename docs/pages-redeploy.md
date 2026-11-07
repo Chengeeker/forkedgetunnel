@@ -31,6 +31,12 @@
 3. 双击脚本，选择 **1 或 2**，按提示填写项目名、Account ID 和部署 Token。已有本地配置时沿用原账号和 Token。
 4. 根据下述初次/再次流程补齐信息，检查目标后输入项目名确认，随后自动执行并等待部署结果。
 
+### 账号令牌和个人令牌选哪个
+
+两个入口都可以使用，但它们的列表各自独立：`/profile/api-tokens` 是个人令牌，`/<账号ID>/api-tokens` 是该账号的令牌。README 的逐步教程采用个人入口；已经在账号入口创建的令牌，只要归属和权限符合要求，也可继续使用。官方已列出账号令牌支持 Pages 与 Workers KV，不能把“账号令牌”直接当作 403 的原因。详见 [README 的入口对照](../README.md#kv-api-token) 和 [Cloudflare 官方说明](https://developers.cloudflare.com/fundamentals/api/get-started/account-owned-tokens/)。
+
+授权要包含**项目所属账号**的 **Cloudflare Pages 编辑 / Pages Write**。`Page Rules` 是页面规则，不是 Pages 项目权限；Workers 编辑权限也不能替代 Pages 权限。个人令牌从用户权限中获得授权，账号令牌也受创建者能够授予的权限范围限制。[Pages 权限说明](https://developers.cloudflare.com/workers/authorization/workers/#cloudflare-pages)
+
 ### 选择 1：初次部署
 
 先确保自己的 fork 仓库已在 Cloudflare 的 GitHub 应用授权范围内。首次连接 GitHub 需在 Cloudflare 控制台完成授权；API Token 不能代替 GitHub 授权，脚本不会替你登录 GitHub。
@@ -65,6 +71,19 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\redeploy-pages
 ```
 
 部署 Token 过期时双击 **`refresh-pages-token.cmd`**，输入新 Token 后继续。存在未完成重建时也可用这个入口更新部署 Token。
+
+## HTTP 403 / 10000 与 KV ID 错误的区别
+
+脚本先读取 Pages 项目，再检查 KV。如果刚输入 Token、打印目标项目后就出现 `HTTP 403，错误码 10000`，表示**读取 Pages 项目的请求被拒绝**；此时尚未检查 KV ID，也未删除项目。不要通过换 KV ID 或删除命名空间来处理。
+
+按下面顺序核对：
+
+1. 实际输入的完整 Token 是否就是刚修改权限的那一条；不要混用两个入口下的同名令牌，不要粘贴 Token ID 或 Global API Key。
+2. 该令牌是否包含 **Cloudflare Pages 编辑 / Pages Write**，资源范围是否包含输入的 **Account ID**。只增加 KV 权限不能授权 Pages。
+3. 令牌是否已生效、过期、被撤销，或有不匹配的客户端 IP 限制。部署脚本从本机网络发出请求，运行时 KV API 则从 Cloudflare 发出，两个调用来源不同。
+4. 若重新生成或改用了另一条 Token，通过 `refresh-pages-token.cmd` 更新本机保存的值；如果是这条令牌本身的权限调整，不需要更换 KV ID。
+
+`403 / 10000` 本身不足以判定上述哪一项有误；新版错误会标明是 Pages 还是 KV 接口失败，不显示敏感响应。若明确提示“KV ID 格式不正确”，才检查原命名空间 ID 是否为 32 位十六进制字符串。旧版本还存在将 `kv_namespaces: null` 当成一个空 ID 的误判，本版已修复，未设置原生绑定时会正常检查运行时 KV 配置。
 
 ## 备份与中断恢复
 

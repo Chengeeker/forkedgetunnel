@@ -7,6 +7,43 @@ function 转为明文([Security.SecureString]$值) {
     return [Net.NetworkCredential]::new('', $值).Password
 }
 
+function 读取部署输入([string]$提示, [switch]$密文) {
+    Write-Host ''
+    $输入 = if ($密文) { Read-Host $提示 -AsSecureString } else { Read-Host $提示 }
+    Write-Host ''
+    return $输入
+}
+
+function 生成接口错误([string]$方法, [string]$路径, [int]$状态码, $代码) {
+    $错误码 = @($代码 | Where-Object { [string]$_ -match '^\d+$' }) -join ','
+    $操作 = 'Cloudflare API 请求'
+    $提示 = @('请检查对应接口的权限、资源范围和控制台状态。')
+    if ($路径 -match '/pages/projects') {
+        $操作 = 'Pages 项目请求'
+        if ($方法 -eq 'GET' -and $路径 -match '/pages/projects/[^/?]+$') { $操作 = '读取 Pages 项目配置' }
+        if ($方法 -eq 'DELETE') { $操作 = '删除 Pages 项目' }
+        if ($方法 -eq 'POST' -and $路径.EndsWith('/pages/projects')) { $操作 = '创建 Pages 项目' }
+        if ($路径 -match '/deployments') { $操作 = 'Pages 部署请求' }
+        if ($状态码 -in @(401,403)) {
+            $提示 = @(
+                'Pages 接口拒绝了当前 Token；这不是 KV ID 格式错误。'
+                '请核对实际粘贴的 Token 是否就是刚修改权限的那一条，且账号范围包含目标 Account ID。'
+                '需要 Cloudflare Pages 编辑 / Pages Write，不是 Page Rules（页面规则）权限。'
+                '同时检查令牌有效期和客户端 IP 限制；账号令牌、个人令牌的列表各自独立。'
+                '如需更换本机保存的 Token，运行 refresh-pages-token.cmd；不要删除项目或 KV。'
+            )
+        }
+    } elseif ($路径 -match '/storage/kv/namespaces') {
+        $操作 = if ($方法 -eq 'POST') { '创建 KV 命名空间' } else { '读取 KV 命名空间' }
+        if ($状态码 -in @(401,403)) {
+            $提示 = @('KV 接口拒绝了当前 Token；请检查目标账号的 KV 读取权限（创建时需编辑权限）。','这是授权失败，不能据此判断 KV ID 格式无效；不要删除原 KV。')
+        }
+    }
+    $错误 = [Exception]::new((@("$操作 失败（HTTP $状态码，错误码 $错误码）。") + $提示) -join [Environment]::NewLine)
+    $错误.Data['status'] = $状态码
+    return $错误
+}
+
 function 保存部署状态($路径, $状态) {
     $密文 = ConvertTo-SecureString ($状态 | ConvertTo-Json -Depth 100 -Compress) -AsPlainText -Force
     $临时路径 = "$路径.new"
@@ -49,10 +86,7 @@ function 调用CF接口($状态, [string]$方法, [string]$路径, $内容 = $nu
         try { $数据 = $响应.Content.ReadAsStringAsync().GetAwaiter().GetResult() | ConvertFrom-Json }
         catch { $数据 = $null }
         if (-not $响应.IsSuccessStatusCode -or $null -eq $数据 -or $数据.success -ne $true) {
-            $错误码 = @($数据.errors | ForEach-Object { if ([string]$_.code -match '^\d+$') { [string]$_.code } }) -join ','
-            $错误 = [Exception]::new("Cloudflare API 失败（HTTP $状态码，错误码 $错误码）。请检查部署 Token 权限或控制台；未输出响应中的凭据。")
-            $错误.Data['status'] = $状态码
-            throw $错误
+            throw (生成接口错误 $方法 $路径 $状态码 @($数据.errors | ForEach-Object { $_.code }))
         }
         return $数据.result
     } finally {
@@ -67,10 +101,11 @@ function 获取现有项目($状态) {
 }
 
 function 选择部署方式 {
+    Write-Host ''
     Write-Host '1：初次部署（创建新项目）'
     Write-Host '2：再次部署（保留 KV，删除并重建已有项目）'
     do {
-        $选择 = (Read-Host '本次是否为初次部署？请输入 1 或 2').Trim()
+        $选择 = (读取部署输入 '本次是否为初次部署？请输入 1 或 2').Trim()
         if ($选择 -in @('1','2')) { return $选择 }
         Write-Host '请输入数字 1 或 2；按 Ctrl+C 可退出。'
     } while ($true)
@@ -82,7 +117,7 @@ function 输入项目名称([string]$默认名称 = '') {
     Write-Host '初次部署：自己起一个名称；再次部署：填写 Cloudflare → Workers & Pages 中原项目的名称，不一定等于 GitHub 仓库名。'
     do {
         $提示 = if ($默认名称) { "项目名称（回车使用 $默认名称）" } else { '项目名称' }
-        $名称 = (Read-Host $提示).Trim()
+        $名称 = (读取部署输入 $提示).Trim()
         if (-not $名称) { $名称 = $默认名称 }
         if ($名称 -cmatch '^[a-z0-9][a-z0-9-]{0,57}$') { return $名称 }
         Write-Host '格式不正确，请只填项目名称，例如 my-tunnel，不含网址、斜杠、空格或下划线。'
@@ -104,16 +139,16 @@ function 查找KV名称($状态, [string]$名称) {
 
 function 输入首次部署计划($状态) {
     Write-Host 'GitHub 仓库示例：your-name/forkedgetunnel；必须已在 Cloudflare 的 GitHub 授权中允许访问。'
-    $仓库 = (Read-Host '你的 GitHub 用户名/仓库名（不要填完整网址）').Trim()
+    $仓库 = (读取部署输入 '你的 GitHub 用户名/仓库名（不要填完整网址）').Trim()
     if ($仓库 -notmatch '^[A-Za-z0-9-]+/[A-Za-z0-9_.-]+$' -or $仓库.EndsWith('.git')) { throw '仓库格式不正确，请填写 用户名/仓库名，例如 your-name/forkedgetunnel。' }
-    $分支 = (Read-Host '部署分支（回车使用 main）').Trim()
+    $分支 = (读取部署输入 '部署分支（回车使用 main）').Trim()
     if (-not $分支) { $分支 = 'main' }
     if ($分支 -notmatch '^[A-Za-z0-9][A-Za-z0-9._/-]{0,199}$' -or $分支.Contains('..')) { throw '分支格式不正确，请填写例如 main。' }
-    $密码 = 转为明文 (Read-Host '设置后台 ADMIN 密码（建议使用长密码，输入隐藏）' -AsSecureString)
-    $确认密码 = 转为明文 (Read-Host '再次输入后台密码' -AsSecureString)
+    $密码 = 转为明文 (读取部署输入 '设置后台 ADMIN 密码（建议使用长密码，输入隐藏）' -密文)
+    $确认密码 = 转为明文 (读取部署输入 '再次输入后台密码' -密文)
     if ([string]::IsNullOrEmpty($密码) -or $密码 -cne $确认密码) { throw '两次密码为空或不一致，尚未创建资源。' }
     Write-Host '已有 KV 数据可填原命名空间 ID；没有则直接回车，自动准备项目专用 KV。'
-    $存储ID = (Read-Host '原 KV 命名空间 ID（可留空，不是名称 KV）').Trim()
+    $存储ID = (读取部署输入 '原 KV 命名空间 ID（可留空，不是名称 KV）').Trim()
     if ($存储ID -and $存储ID -notmatch '^[a-fA-F0-9]{32}$') { throw 'KV ID 格式不正确，应为 32 位十六进制 ID。' }
     $状态 | Add-Member -NotePropertyName kvId -NotePropertyValue $存储ID -Force
     $状态 | Add-Member -NotePropertyName kvTitle -NotePropertyValue "forkedgetunnel-$($状态.name)-production-KV" -Force
@@ -161,7 +196,7 @@ function 补齐配置密钥($项目, $原计划, [switch]$刷新) {
             $已有 = $原计划.deployment_configs.$环境.env_vars.($变量.Name).value
             if ($刷新 -or [string]::IsNullOrEmpty($已有)) {
                 Write-Host "请填写 $环境 环境中 $($变量.Name) 的原值；Cloudflare 的密钥无法可靠读回。"
-                $已有 = 转为明文 (Read-Host '原密钥（输入隐藏，直接回车则停止）' -AsSecureString)
+                $已有 = 转为明文 (读取部署输入 '原密钥（输入隐藏，直接回车则停止）' -密文)
             }
             if ([string]::IsNullOrEmpty($已有)) { throw '缺少可恢复的密钥，尚未删除项目。' }
             $变量.Value | Add-Member -NotePropertyName value -NotePropertyValue $已有 -Force
@@ -175,7 +210,12 @@ function 检查原KV($状态, $项目) {
     foreach ($环境 in @('production', 'preview')) {
         $配置 = $项目.deployment_configs.$环境
         if (-not $配置) { continue }
-        $命名空间列表 = @($配置.kv_namespaces.PSObject.Properties | ForEach-Object { $_.Value.namespace_id })
+        $命名空间列表 = @()
+        foreach ($绑定 in @($配置.kv_namespaces.PSObject.Properties)) {
+            if (-not $绑定) { continue }
+            if (-not $绑定.Value.namespace_id) { throw "$环境 的 KV 绑定 $($绑定.Name) 缺少 namespace_id，尚未删除项目。" }
+            $命名空间列表 += $绑定.Value.namespace_id
+        }
         $变量 = $配置.env_vars
         if (-not $配置.kv_namespaces.KV) {
             $存储账号 = [string]$变量.CLOUDFLARE_ACCOUNT_ID.value
@@ -195,7 +235,7 @@ function 检查原KV($状态, $项目) {
             }
         }
         foreach ($命名空间 in $命名空间列表) {
-            if ($命名空间 -notmatch '^[a-fA-F0-9]{32}$') { throw 'KV ID 无效，尚未删除项目。' }
+            if ($命名空间 -notmatch '^[a-fA-F0-9]{32}$') { throw "$环境 的 KV ID 格式不正确，应为 32 位十六进制命名空间 ID；尚未删除项目。" }
             if (-not $已检查.ContainsKey($命名空间)) {
                 $null = 调用CF接口 $状态 GET "/accounts/$($状态.account)/storage/kv/namespaces/$命名空间"
                 $已检查[$命名空间] = $true
@@ -275,7 +315,7 @@ function 执行重建($状态, $状态路径) {
                 throw '同名项目与待恢复的新项目不匹配，停止，不删除它。'
             }
             Write-Host "发现可能因上次响应丢失而未记录的新项目 ID：$($当前.id)"
-            if ((Read-Host '请在控制台核对后输入该新项目 ID 以继续恢复；其他输入停止') -cne $当前.id) { throw '尚未确认恢复目标，停止。' }
+            if ((读取部署输入 '请在控制台核对后输入该新项目 ID 以继续恢复；其他输入停止') -cne $当前.id) { throw '尚未确认恢复目标，停止。' }
             $新项目 = $当前
         } else { $新项目 = 调用CF接口 $状态 POST "/accounts/$($状态.account)/pages/projects" $状态.plan }
         if (-not $新项目.id) { throw '未取得新项目 ID，停止。' }
@@ -318,7 +358,7 @@ function 启动重建程序 {
     if (Test-Path -LiteralPath $状态路径) {
         $状态 = 读取部署状态 $状态路径
         if ($RefreshToken) {
-            $新令牌 = 转为明文 (Read-Host '新的部署 API Token（输入隐藏）' -AsSecureString)
+            $新令牌 = 转为明文 (读取部署输入 '新的部署 API Token（输入隐藏）' -密文)
             if ($新令牌 -notmatch '^[A-Za-z0-9_-]{20,256}$') { throw '新 Token 格式不正确，原备份未改动。' }
             $状态.token = $新令牌
             保存部署状态 $状态路径 $状态
@@ -336,21 +376,26 @@ function 启动重建程序 {
     $方式 = 选择部署方式
     $名称 = if ($方式 -eq '2') { 输入项目名称 $状态.name } else { 输入项目名称 }
     $原状态 = $状态
-    $账号 = if ($原状态) { $原状态.account } else { (Read-Host 'Cloudflare Account ID（账号 ID，不是邮箱）').Trim() }
-    $令牌 = if ($原状态) { $原状态.token } else { 转为明文 (Read-Host '部署 API Token（Pages 编辑；初次创建 KV 需 KV 编辑，输入隐藏）' -AsSecureString) }
+    $账号 = if ($原状态) { $原状态.account } else { (读取部署输入 'Cloudflare Account ID（账号 ID，不是邮箱）').Trim() }
+    if ($原状态) { $令牌 = $原状态.token } else {
+        Write-Host '部署 Token 权限：Cloudflare Pages 编辑；KV 初次创建选编辑，再次部署选读取。'
+        Write-Host '账号令牌或个人令牌均可，授权范围须包含上面的 Account ID；不是 Page Rules 权限。'
+        $令牌 = 转为明文 (读取部署输入 '粘贴部署 API Token 完整值（输入隐藏）' -密文)
+    }
     $状态 = [pscustomobject]@{
         account=$账号; name=$名称; token=$令牌; phase='new'
         oldId=$null; newId=$null; deploymentId=$null; plan=$null; domains=@()
     }
     if ($原状态 -and $原状态.name -ceq $名称) { $状态.plan = $原状态.plan }
     Write-Host "目标 Pages 项目：$($状态.name)"
+    Write-Host '正在读取 Pages 项目配置并检查访问权限……'
     $项目 = 获取现有项目 $状态
     if ($方式 -eq '1') {
         if ($项目) { throw '同名项目已经存在，请重新运行选择 2（再次部署），或换一个新名称；原项目未改动。' }
         $状态.plan = 输入首次部署计划 $状态
         Write-Host "将创建 $名称，部署 $($状态.plan.source.config.owner)/$($状态.plan.source.config.repo_name) 的 $($状态.plan.production_branch) 分支。"
         Write-Host "KV：$(if ($状态.kvId) { $状态.kvId } else { $状态.kvTitle + '（存在则复用，否则创建）' })"
-        if ((Read-Host '确认创建请输入项目名；其他输入取消') -cne $名称) { Write-Host '已取消，尚未创建资源。'; return }
+        if ((读取部署输入 '确认创建请输入项目名；其他输入取消') -cne $名称) { Write-Host '已取消，尚未创建资源。'; return }
         if (Test-Path -LiteralPath $状态路径) { Copy-Item -LiteralPath $状态路径 -Destination (Join-Path $目录 ("backup-" + [DateTime]::UtcNow.ToString('yyyyMMddHHmmssfff') + '.clixml')) }
         $状态.phase = 'initializing'
         保存部署状态 $状态路径 $状态
@@ -364,7 +409,7 @@ function 启动重建程序 {
         Write-Host '即将删除并重建同名 Pages 项目。期间服务中断，旧部署历史和部署挂钩不会保留。'
         Write-Host '自定义域名会重新关联，DNS 记录不改动，证书可能需要等待重新签发。'
         Write-Host '恢复范围为下述 Git 构建、环境变量、KV 与域名关联；Access 等项目外策略需另行核对。'
-        if ((Read-Host '确认继续请输入项目名；其他输入取消') -cne $状态.name) { Write-Host '已取消，原项目未删除。'; return }
+        if ((读取部署输入 '确认继续请输入项目名；其他输入取消') -cne $状态.name) { Write-Host '已取消，原项目未删除。'; return }
         $状态.plan = $计划; $状态.domains = @($项目.domains | Where-Object { $_ -notlike '*.pages.dev' })
         $状态.oldId = $项目.id; $状态.newId = $null; $状态.deploymentId = $null; $状态.phase = 'prepared'
         保存部署状态 $状态路径 $状态

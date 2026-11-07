@@ -55,13 +55,22 @@ The independent local-cfdata launcher uses GPL-3.0-or-later; see its LICENSE.
 
 **第二步：创建允许读写 KV 的 API Token（按 2026-11-07 实际中文界面核对）。**
 
-本节使用 **我的个人资料 → API 令牌** 中的用户令牌。新版创建页会显示 **Policies**，中文页面也可能保留部分英文。**新版不用找“创建自定义令牌”按钮，也没有单独的“Account Resources（账号资源）”区域**，直接按下面操作：
+**先分清两个入口：它们管理不同归属的令牌，列表不同是正常的。**
+
+| 入口 | 令牌归属 | 本项目如何使用 |
+| --- | --- | --- |
+| [我的个人资料 → API 令牌](https://dash.cloudflare.com/profile/api-tokens)，网址含 `/profile/api-tokens` | 个人用户，权限受该用户在目标账号中的权限限制 | 以下逐步教程使用这个入口 |
+| 控制台选择账号 → 管理账号 → 账号 API 令牌，网址形如 `https://dash.cloudflare.com/<账号ID>/api-tokens` | 所选 Cloudflare 账号 | 也可使用，确认令牌属于项目所在账号并有对应权限 |
+
+截至 2026-11-07，官方兼容表列出**账号令牌支持 Pages 和 Workers KV**，个人令牌也可用于本教程；无需因为入口不同而重建 KV。[账号令牌说明](https://developers.cloudflare.com/fundamentals/api/get-started/account-owned-tokens/)。关键是**实际粘贴的完整 Token、权限和账号范围一致**。两个列表里即使名称相同，也不能当作同一条 Token；在哪个入口创建，就去相应入口管理。
+
+下面使用 **个人资料入口**。新版创建页会显示 **Policies**，中文页面也可能保留部分英文。**新版不用找“创建自定义令牌”按钮，也没有单独的“Account Resources（账号资源）”区域**，直接按下面操作：
 
 1. 打开 [我的个人资料 → API 令牌](https://dash.cloudflare.com/profile/api-tokens)，点击 **创建令牌**。如果已经看到“令牌名称”和“Policies”，就已进入创建页。
 2. 在 **令牌名称** 填 `forkedgetunnel-kv`，方便以后识别用途。
 3. 在 **Policies** 下点击 **从头开始（Custom）**，在菜单选择 **Start with an Account policy**（创建账号级策略）。页面会展开 **Edit 帐户 policy** 编辑区。
 4. 编辑区的规则保留 **包括**；打开旁边的 **帐户** 下拉框，将默认的 **所有帐户** 改为 **Pages 项目所属的那个账号**。它应与第一步复制的 `CLOUDFLARE_ACCOUNT_ID` 对应。
-5. 在 **搜索权限组……** 中输入 `KV`，找到 **开发人员平台 → Workers KV 存储**，只勾选右侧的 **编辑**。英文界面对应 **Workers KV Storage → Edit**。**编辑已包含创建、读取、写入和列出权限，不用再单独勾“读取”**；本项目只需这一项权限。
+5. 在 **搜索权限组……** 中输入 `KV`，找到 **开发人员平台 → Workers KV 存储**，只勾选右侧的 **编辑**。英文界面对应 **Workers KV Storage → Edit**。**编辑已包含创建、读取、写入和列出权限，不用再单独勾“读取”**。这里只配置 Worker 运行时的 KV 存储，所需权限为这一项；若用于 [Windows 部署脚本](./docs/pages-redeploy.md)，还需 **Cloudflare Pages 编辑 / Pages Write**，不要选成 **Page Rules（页面规则）**。
 6. **令牌过期时间** 按使用期限选择，若设置了期限，需要在过期前替换 Pages 中的 Token。**客户端 IP 地址过滤** 留空，保留默认范围；这里的调用来自 Cloudflare 运行环境，不是你的电脑，不要填自己电脑的 IP。
 7. 点击 **继续以显示摘要**，确认 **权限策略** 中显示的是你的项目账号，以及 **Workers KV 存储: 编辑**。检查权限范围正确后，再点击 **创建令牌**。
 8. 复制随后显示的 **Token 完整值**，作为 Pages 加密变量 `CLOUDFLARE_API_TOKEN` 的值。它不是 Token ID，也不是 Global API Key；完整值只显示一次，不要发到聊天或提交到 GitHub。填完后继续下面第三步和 Pages 变量表。
