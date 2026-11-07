@@ -7,6 +7,14 @@ GNU General Public License, version 2.
 
 # 开发记录
 
+## API Token 教程适配新版策略界面（2026-11-07）
+
+- 用户反馈 Token 教程的设置与官网不符，并授权通过 computer-use 查看 Chrome。实际个人资料创建页已使用 `Policies`：`从头开始（Custom）` → `Start with an Account policy` → `Edit 帐户 policy`；账号资源在策略内的“包括 / 帐户”中设置，权限改为搜索组并勾选，不再是独立的 `Account Resources` 加三列权限选择。之前只核对官方权限名称就把旧版布局当作当前布局，是本轮需要纠正的文档错误。
+- README 改为新版实际中文及保留英文的逐步操作，增加 `#kv-api-token` 稳定锚点；旧版三列界面仅作为条件说明。搜索 `KV` 后可见“开发人员平台 → Workers KV 存储”的“读取 / 编辑”，只选编辑；官方说明 Edit 包含 CRUDL，因此不额外要求读取权限。账号限定为项目所属账号，不授予 Workers 模板的其他权限。
+- 说明过期时间及客户端 IP 过滤的影响：运行时调用来自 Cloudflare，不能把用户电脑 IP 当作调用来源。继续保留 Token 完整值、加密填写、账号 ID 对应关系及已有项目补变量后需新部署的说明。
+- 浏览器仅准备了名称、指定账号和单项 KV 编辑权限的草稿，并在“令牌摘要”中确认；没有点击最终“创建令牌”，没有生成、复制或发布凭据，没有修改 Pages 变量。核对截图保存在被忽略的 `build/token-guide-check/`，不提交用户账号截图或标识到公开仓库。最终创建属于新增持久访问，应在用户决定后执行。
+- 本轮仅修改 README 和开发记录，检查差异、锚点及字段说明；不重跑运行代码构建或代理测试。当前界面经真实 Chrome 验证，Token/API 权限执行和线上 KV 创建仍未验收。官方依据为 [创建 Token](https://developers.cloudflare.com/fundamentals/api/get-started/create-token/)及[权限列表](https://developers.cloudflare.com/fundamentals/api/reference/permissions/)，按既有授权推送到 `forkedgetunnel/main`。
+
 ## README 部署操作补全（2026-11-03）
 
 - 用户确认目前只设置了 `admin`，随后要求把 README 讲清楚。该条件会在 `获取配置存储` 中因缺少账号 ID、Token、名称/ID 而返回原 KV 空值，进入未配置页面；此时未调用创建 API，不能把现象归因于 API 权限拒绝或平台创建失败。本轮仅补文档，没有再改存储逻辑或扩大部署承诺。

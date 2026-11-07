@@ -116,15 +116,24 @@ GNU General Public License, version 2. See LICENSE for the complete text.
 2. 打开 **Workers & Pages**，在 **Account Details（账号详情）** 中复制 **Account ID**。也可使用控制台搜索框，输入 `Copy account ID` 后复制结果。
 3. 这就是 `CLOUDFLARE_ACCOUNT_ID` 的值，通常是 32 位十六进制字符串。请复制 **Account ID**，不要复制域名的 Zone ID。操作位置见 [Cloudflare 官方说明](https://developers.cloudflare.com/fundamentals/account/find-account-and-zone-ids/)。
 
-**第二步：创建允许读写 KV 的 API Token。**
+<a id="kv-api-token"></a>
 
-1. 打开 [My Profile → API Tokens](https://dash.cloudflare.com/profile/api-tokens)，点击 **Create Token（创建令牌）**。
-2. 选择 **Create Custom Token（创建自定义令牌）**，名称可以填 `forkedgetunnel-kv`。
-3. 在 **Permissions（权限）** 中添加一项：**Account（账号） → Workers KV Storage → Edit（编辑）**。
-4. 在 **Account Resources（账号资源）** 中选择 **Include（包括） → Specific account（指定账号）**，选中第一步复制 ID 的那个账号。
-5. 检查后点击 **Continue to summary → Create Token**，复制新显示的 **Token 完整值**。它就是 `CLOUDFLARE_API_TOKEN`，不是 Token ID，也不是 Global API Key。Token 完整值通常只显示一次，请妥善保存，并在 Pages 中加密填写。
+**第二步：创建允许读写 KV 的 API Token（按 2026-11-07 实际中文界面核对）。**
 
-这个运行时存储方案只需要当前账号的 KV 编辑权限，不需要 Pages 编辑权限。创建 Token 的界面说明见 [Cloudflare 官方教程](https://developers.cloudflare.com/fundamentals/api/get-started/create-token/)。
+本节使用 **我的个人资料 → API 令牌** 中的用户令牌。新版创建页会显示 **Policies**，中文页面也可能保留部分英文。**新版不用找“创建自定义令牌”按钮，也没有单独的“Account Resources（账号资源）”区域**，直接按下面操作：
+
+1. 打开 [我的个人资料 → API 令牌](https://dash.cloudflare.com/profile/api-tokens)，点击 **创建令牌**。如果已经看到“令牌名称”和“Policies”，就已进入创建页。
+2. 在 **令牌名称** 填 `forkedgetunnel-kv`，方便以后识别用途。
+3. 在 **Policies** 下点击 **从头开始（Custom）**，在菜单选择 **Start with an Account policy**（创建账号级策略）。页面会展开 **Edit 帐户 policy** 编辑区。
+4. 编辑区的规则保留 **包括**；打开旁边的 **帐户** 下拉框，将默认的 **所有帐户** 改为 **Pages 项目所属的那个账号**。它应与第一步复制的 `CLOUDFLARE_ACCOUNT_ID` 对应。
+5. 在 **搜索权限组……** 中输入 `KV`，找到 **开发人员平台 → Workers KV 存储**，只勾选右侧的 **编辑**。英文界面对应 **Workers KV Storage → Edit**。**编辑已包含创建、读取、写入和列出权限，不用再单独勾“读取”**；本项目只需这一项权限。
+6. **令牌过期时间** 按使用期限选择，若设置了期限，需要在过期前替换 Pages 中的 Token。**客户端 IP 地址过滤** 留空，保留默认范围；这里的调用来自 Cloudflare 运行环境，不是你的电脑，不要填自己电脑的 IP。
+7. 点击 **继续以显示摘要**，确认 **权限策略** 中显示的是你的项目账号，以及 **Workers KV 存储: 编辑**。检查权限范围正确后，再点击 **创建令牌**。
+8. 复制随后显示的 **Token 完整值**，作为 Pages 加密变量 `CLOUDFLARE_API_TOKEN` 的值。它不是 Token ID，也不是 Global API Key；完整值只显示一次，不要发到聊天或提交到 GitHub。填完后继续下面第三步和 Pages 变量表。
+
+**如果你的页面仍是旧版三列下拉框：** 在 **Permissions（权限）** 选择 **Account → Workers KV Storage → Edit**，在 **Account Resources（账号资源）** 选择 **Include → Specific account → 项目所属账号**，然后继续摘要和创建。只有这种旧版界面才按这些字段名查找。
+
+以上流程已在实际 Chrome 创建页走到权限摘要，未生成 Token 或验证线上存储。权限含义及创建流程依据 [Cloudflare 官方教程](https://developers.cloudflare.com/fundamentals/api/get-started/create-token/)和[官方权限列表](https://developers.cloudflare.com/fundamentals/api/reference/permissions/)。
 
 **第三步：确定一个固定的存储名称。**
 
