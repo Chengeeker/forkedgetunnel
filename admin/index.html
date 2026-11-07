@@ -12503,6 +12503,8 @@
 					fill: none;
 				}
 
+				#importBtn[hidden] { display: none; }
+
 				.editor {
 					margin-top: 16px;
 					border: 1px solid var(--line-strong);
@@ -13864,10 +13866,10 @@
 								<p class="tiny muted">可粘贴在线优选域名站导出的域名:端口#备注，每行一个。域名先解析 IP 再初筛、测速，结果保留域名；最多尝试四个解析地址，测量只代表当时解析结果。</p>
 								<div class="control-row">
 									<div class="field">
-										<label for="librarySelect">IP库</label>
+										<label for="librarySelect">地址来源</label>
 										<select class="select" id="librarySelect" disabled></select>
 									</div>
-									<button class="btn secondary" id="importBtn" type="button" disabled>
+									<button class="btn secondary" id="importBtn" type="button" disabled hidden>
 										<svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
 											<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
 											<path d="M7 10l5 5 5-5"></path>
@@ -13883,6 +13885,7 @@
 									</button>
 								</div>
 
+								<p class="tiny muted" id="inputSourceHint" role="status">选择“自定义 IP / 域名”，在下方每行粘贴一个地址。</p>
 								<details class="settings-block advanced-settings">
 									<summary class="advanced-settings-summary">
 										<span class="advanced-settings-copy">
@@ -14253,6 +14256,7 @@
 					saveEasterHold: null,
 					suppressNextSaveClick: false,
 					preferredLibraryKey: "",
+					libraryImport: null,
 					resultFilters: {},
 					openResultFilterKey: ""
 				};
@@ -14266,6 +14270,7 @@
 					ipv6Card: $("#ipv6Card"),
 					ipv6Tag: $("#ipv6Tag"),
 					librarySelect: $("#librarySelect"),
+					inputSourceHint: $("#inputSourceHint"),
 					importBtn: $("#importBtn"),
 					ipInput: $("#ipInput"),
 					lineCount: $("#lineCount"),
@@ -14306,6 +14311,7 @@
 
 				document.addEventListener("DOMContentLoaded", () => {
 					bindEvents();
+					updateLibraryOptions();
 					updateEditorMeta();
 					scheduleBootLoadingProgress();
 					detectNetwork();
@@ -14531,11 +14537,11 @@
 					bindApplicationProxyEvents();
 					els.importBtn.addEventListener("click", importLibrary);
 					els.librarySelect.addEventListener("change", rememberSelectedLibrary);
-					els.ipInput.addEventListener("input", updateEditorMeta);
+					els.ipInput.addEventListener("input", useCustomInput);
 					els.ipInput.addEventListener("scroll", syncEditorScroll);
 					els.clearBtn.addEventListener("click", () => {
 						els.ipInput.value = "";
-						updateEditorMeta();
+						useCustomInput();
 					});
 					[els.limitInput, els.timeoutInput, els.threadsInput, els.speedThreadsInput, els.portInput].forEach((input) => {
 						input.addEventListener("change", () => clampNumberInput(input));
@@ -15051,6 +15057,7 @@
 
 				function librarySelectionKey(source) {
 					if (!source) return "";
+					if (source.value === "custom") return "custom";
 					const family = source.family || (source.dataset && source.dataset.family) || "";
 					const url = source.url || (source.dataset && source.dataset.url) || "";
 					return family && url ? `${family}|${url}` : "";
@@ -15075,8 +15082,28 @@
 				}
 
 				function rememberSelectedLibrary() {
+					state.libraryImport = null;
 					const key = librarySelectionKey(els.librarySelect.selectedOptions[0]);
 					if (key) cacheLibraryKey(key);
+					updateInputSource();
+				}
+
+				function useCustomInput() {
+					if (els.librarySelect.value !== "custom") {
+						els.librarySelect.value = "custom";
+						rememberSelectedLibrary();
+					}
+					updateEditorMeta();
+				}
+
+				function updateInputSource() {
+					const custom = els.librarySelect.value === "custom";
+					els.importBtn.hidden = custom;
+					els.importBtn.disabled = custom || Boolean(state.libraryImport);
+					els.importBtn.textContent = state.libraryImport ? "导入中" : "导入所选 IP 库";
+					els.inputSourceHint.textContent = custom
+						? "在下方粘贴 IP 或域名，每行一个，支持 :端口#备注。初筛保留输入原文；结果可测速、排序后导入。"
+						: "点击“导入所选 IP 库”填入下方；直接编辑或粘贴会切换到自定义。";
 				}
 
 				function preferredLibraryKey() {
@@ -15088,15 +15115,11 @@
 					const selectedKey = preferredLibraryKey();
 					const options = IP_LIBRARIES;
 					els.librarySelect.innerHTML = "";
-					if (!options.length) {
-						const option = document.createElement("option");
-						option.textContent = "无可用IP库";
-						option.value = "";
-						els.librarySelect.appendChild(option);
-						els.librarySelect.disabled = true;
-						els.importBtn.disabled = true;
-						return;
-					}
+					const customOption = document.createElement("option");
+					customOption.textContent = "自定义 IP / 域名";
+					customOption.value = "custom";
+					customOption.dataset.libraryKey = "custom";
+					els.librarySelect.appendChild(customOption);
 
 					options.forEach((item) => {
 						const key = librarySelectionKey(item);
@@ -15115,10 +15138,10 @@
 					if (restoredOption) {
 						els.librarySelect.value = restoredOption.value;
 						state.preferredLibraryKey = selectedKey;
-					}
+					} else { els.librarySelect.value = "custom"; }
 
 					els.librarySelect.disabled = false;
-					els.importBtn.disabled = false;
+					updateInputSource();
 				}
 
 				function updateActionAvailability() {
@@ -15137,21 +15160,24 @@
 				async function importLibrary() {
 					const option = els.librarySelect.selectedOptions[0];
 					if (!option || !option.dataset.url) return;
-					els.importBtn.disabled = true;
-					const original = els.importBtn.innerHTML;
-					els.importBtn.textContent = "导入中";
+					const request = {};
+					state.libraryImport = request;
+					updateInputSource();
 					try {
 						const library = IP_LIBRARIES.find(item => librarySelectionKey(item) === librarySelectionKey(option));
 						const text = library && library.content ? library.content : await fetchText(`${option.dataset.url}${option.dataset.url.includes("?") ? "&" : "?"}_t=${Date.now()}`, 20000);
+						if (state.libraryImport !== request) return;
 						if (!text.trim() || /^\s*</.test(text)) throw new Error("IP 库返回了空内容或网页，请更换 IP 库");
 						els.ipInput.value = text.trim();
 						updateEditorMeta();
 						els.latencyStatus.textContent = `已导入 ${option.textContent}`;
 					} catch (error) {
-						els.latencyStatus.textContent = `导入失败：${friendlyError(error)}`;
+						if (state.libraryImport === request) els.latencyStatus.textContent = `导入失败：${friendlyError(error)}`;
 					} finally {
-						els.importBtn.innerHTML = original;
-						els.importBtn.disabled = false;
+						if (state.libraryImport === request) {
+							state.libraryImport = null;
+							updateInputSource();
+						}
 					}
 				}
 
@@ -15187,8 +15213,6 @@
 						return;
 					}
 
-					els.ipInput.value = candidates.join("\n");
-					updateEditorMeta();
 					state.results = [];
 					state.selectedIds.clear();
 					state.nextResultId = 1;
@@ -15209,11 +15233,12 @@
 					setProgress(0, candidates.length);
 					updateActionAvailability();
 
-					await runPool(candidates, settings.threads, async (address) => {
+					await runPool(candidates, settings.threads, async (candidate) => {
 						if (run.stopped) return;
 						try {
-							const result = await testLatency(address, settings.timeout, run);
+							const result = await testLatency(candidate.address, settings.timeout, run);
 							if (result && !run.stopped) {
+								result.remark = candidate.remark;
 								result.id = state.nextResultId++;
 								state.results.push(result);
 								state.results.sort((a, b) => a.latency - b.latency);
@@ -15746,7 +15771,7 @@
 						const safeAddress = escapeHtml(item.address);
 						return `<tr class="result-row${selected ? " is-selected" : ""}" data-result-id="${escapeHtml(id)}">
 		  <td class="selection-cell"><input type="checkbox" data-select-id="${escapeHtml(id)}" aria-label="选择 ${safeAddress}" ${selected ? "checked" : ""}></td>
-		  <td class="ip-cell"><button class="copy-address-btn" type="button" data-copy-address="${safeAddress}" title="点击复制" aria-label="复制 ${safeAddress}">${safeAddress}</button></td>
+		  <td class="ip-cell"><button class="copy-address-btn" type="button" data-copy-address="${safeAddress}" title="点击复制" aria-label="复制 ${safeAddress}">${safeAddress}</button>${item.remark ? `<div class="tiny muted">${escapeHtml(item.remark)}</div>` : ""}</td>
 		  <td>${escapeHtml(item.ipType || "未知")}</td>
 		  <td>${escapeHtml(item.type)}</td>
 		  <td>${renderCountryCell(item.country)}</td>
@@ -15943,7 +15968,7 @@
 				}
 
 				function selectedResults() {
-					return state.results.filter((item) => state.selectedIds.has(String(item.id)));
+					return getSortedResults().map(({ item }) => item).filter((item) => state.selectedIds.has(String(item.id)));
 				}
 
 				function saveSelectedResults() {
@@ -16091,7 +16116,7 @@
 					if (item.speedState === "done" && Number.isFinite(item.speedMbps) && item.speedMbps > 0) {
 						details.push(`${formatSpeedMbps(item.speedMbps)}Mbps`);
 					}
-					return `${item.address}#${item.country} ${item.type}[${details.join(" ")}]`;
+					return `${item.address}#${item.remark ? item.remark + " | " : ""}${item.country} ${item.type}[${details.join(" ")}]`;
 				}
 
 				function sendSelectedResultsToParent(lines) {
@@ -16469,34 +16494,30 @@
 				function prepareCandidates(rawText, limit, preferredPort) {
 					const lines = rawText
 						.split(/\r\n|\r|\n/)
-						.map(cleanInputLine)
-						.filter(Boolean);
+						.map(line => ({ address: cleanInputLine(line), remark: line.includes("#") ? line.slice(line.indexOf("#") + 1).trim() : "" }))
+						.filter(item => item.address);
 
 					if (!lines.length) throw new Error(CANDIDATE_INPUT_ERROR_MESSAGE);
 
 					const fixed = [];
 					const cidrs = [];
 					const ranges = [];
-					for (const line of lines) {
+					for (const { address: line, remark } of lines) {
 						if (line.includes("/")) {
 							const cidr = parseCidr(line);
-							if (cidr) cidrs.push(cidr);
+							if (cidr) cidrs.push({ ...cidr, remark });
 							continue;
 						}
 						const range = parseIpRange(line);
 						if (range) {
-							ranges.push(range);
+							ranges.push({ ...range, remark });
 							continue;
 						}
 						const normalized = normalizeDomainCandidate(line, preferredPort) || normalizeAddress(line, preferredPort);
-						if (normalized) fixed.push(normalized);
+						if (normalized) fixed.push({ address: normalized, remark });
 					}
 
-					// 随机打乱固定IP、CIDR和范围列表，以确保每次选取的候选IP是随机且不同的
-					for (let i = fixed.length - 1; i > 0; i--) {
-						const j = Math.floor(Math.random() * (i + 1));
-						[fixed[i], fixed[j]] = [fixed[j], fixed[i]];
-					}
+					// 明确输入的地址保留顺序；网段和范围仍随机抽样。
 					for (let i = cidrs.length - 1; i > 0; i--) {
 						const j = Math.floor(Math.random() * (i + 1));
 						[cidrs[i], cidrs[j]] = [cidrs[j], cidrs[i]];
@@ -16508,21 +16529,21 @@
 
 					const candidates = [];
 					const seen = new Set();
-					const addCandidate = (address) => {
+					const addCandidate = (address, remark = "") => {
 						if (!address || seen.has(address) || candidates.length >= limit) return false;
 						seen.add(address);
-						candidates.push(address);
+						candidates.push({ address, remark });
 						return true;
 					};
 
-					fixed.forEach(addCandidate);
+					fixed.forEach(({ address, remark }) => addCandidate(address, remark));
 
 					if (cidrs.length && candidates.length < limit) {
 						let attempts = 0;
 						const maxAttempts = Math.max(limit * 12, cidrs.length * 8);
 						while (candidates.length < limit && attempts < maxAttempts) {
 							const cidr = cidrs[attempts % cidrs.length];
-							addCandidate(randomAddressFromCidr(cidr, preferredPort));
+							addCandidate(randomAddressFromCidr(cidr, preferredPort), cidr.remark);
 							attempts += 1;
 						}
 					}
@@ -16532,7 +16553,7 @@
 						const maxAttempts = Math.max(limit * 12, ranges.length * 8);
 						while (candidates.length < limit && attempts < maxAttempts) {
 							const range = ranges[attempts % ranges.length];
-							addCandidate(randomAddressFromRange(range, preferredPort));
+							addCandidate(randomAddressFromRange(range, preferredPort), range.remark);
 							attempts += 1;
 						}
 					}

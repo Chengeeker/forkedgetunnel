@@ -14,7 +14,7 @@ const select = {
   get selectedOptions() { return [this.options.find(option => option.value === this.value) || this.options[0]].filter(Boolean); }
 };
 const state = {networkChecking: false, results: [], ipv4: null, ipv6: null};
-const els = {librarySelect: select, importBtn: {}, ipInput: {value: 'previous input'}, latencyStatus: {}, latencyBtn: {}, speedAllBtn: {}};
+const els = {librarySelect: select, inputSourceHint: {}, importBtn: {}, ipInput: {value: 'previous input'}, latencyStatus: {}, latencyBtn: {}, speedAllBtn: {}};
 let failingHosts = new Set(), remoteText = '', fetches = 0;
 const context = {
   state, els, Map, Set, Promise, Math, Array, Error,
@@ -52,7 +52,8 @@ vm.runInContext(
 
   // Failed dual-stack detection must not hide static libraries or block a retry.
   context.updateLibraryOptions();
-  assert.equal(select.options.length, 7); assert.equal(select.disabled, false); assert.equal(els.importBtn.disabled, false);
+  assert.equal(select.options.length, 8); assert.equal(select.disabled, false); assert.equal(select.value, 'custom'); assert.equal(els.importBtn.hidden, true);
+  await context.importLibrary(); assert.equal(els.ipInput.value, 'previous input'); assert.equal(fetches, 0);
   context.updateActionAvailability();
   assert.equal(els.latencyBtn.disabled, false); assert.equal(els.speedAllBtn.disabled, true);
   for (const family of ['ipv4', 'ipv6']) {
@@ -69,6 +70,22 @@ vm.runInContext(
   await context.importLibrary();
   assert.equal(els.ipInput.value, previousInput); assert(els.latencyStatus.textContent.includes('网页'));
   remoteText = '192.0.2.0/24'; await context.importLibrary(); assert.equal(els.ipInput.value, remoteText);
+  let finishImport;
+  context.fetchText = () => new Promise(resolve => finishImport = resolve);
+  const importing = context.importLibrary();
+  assert.equal(els.importBtn.disabled, true);
+  els.ipInput.value = 'custom.example:443#my entry'; context.useCustomInput();
+  assert.equal(select.value, 'custom'); assert.equal(els.importBtn.hidden, true);
+  finishImport('192.0.2.99:443'); await importing;
+  assert.equal(els.ipInput.value, 'custom.example:443#my entry');
+  context.updateLibraryOptions(); assert.equal(select.value, 'custom');
+  // A source switch also invalidates an older import without overwriting input or a newer status.
+  select.value = select.options.find(option => option.textContent === 'CM优选列表v4').value;
+  context.rememberSelectedLibrary(); const switched = context.importLibrary();
+  select.value = select.options.find(option => option.dataset.family === 'ipv6').value;
+  context.rememberSelectedLibrary();
+  finishImport('192.0.2.88:443'); await switched;
+  assert.equal(els.ipInput.value, 'custom.example:443#my entry'); assert.equal(els.importBtn.disabled, false);
   state.networkChecking = true; context.updateActionAvailability(); assert.equal(els.latencyBtn.disabled, true);
 
   context.fetchJsonFromFastestEndpoint = async () => ({endpoint: 'https://test.invalid', data: {}});
