@@ -30,6 +30,7 @@ The independent local-cfdata launcher uses GPL-3.0-or-later; see its LICENSE.
 2. [首次使用与订阅](#first-use)：确认保存成功，选择订阅模式，再导入客户端。
 3. [在线优选 IP / 域名](#online-optimize) 或 [Windows 本地优选](#windows-cfdata)：测试后使用自定义订阅模式保存结果。
 4. 需要调整配置时查看 [环境变量](#environment-variables)、[升级与排错](#maintenance)。
+5. 如果你的项目需要删除后重建，使用 [Windows 自动重建脚本](./docs/pages-redeploy.md)：保留原 KV，自动备份和恢复项目配置，再构建 GitHub 生产分支。
 
 **已经部署且只填了 `ADMIN` 的项目，请按 [已有项目补救步骤](#existing-pages-recovery) 操作。** 旧部署补变量后仍需一次新部署；首次填齐的项目无需补绑再部署。
 
@@ -226,6 +227,8 @@ IP 库独立于线路检测显示。**CF 官方网段 v4/v6（内置）**可直�
 <a id="maintenance"></a>
 
 ## 升级与排错
+
+需要“删掉原项目再部署”时，可双击仓库中的 **`redeploy-pages.cmd`**。首次配置部署 Token 和原加密变量后，后续只需核对目标项目并确认；脚本会保留原 KV，备份配置、删除并重建同名 Pages 项目、恢复变量及绑定，然后等待部署结果。**不要先手动删除项目。** 重建期间会中断服务且旧部署历史不保留，完整操作见 [Windows 自动重建说明](./docs/pages-redeploy.md)。
 
 Pages 关联的是你自己的 GitHub 仓库和生产分支。更新代码后，检查 Pages 新部署是否成功，再刷新管理页面；客户端仍需更新订阅。持续使用同一 KV 名称 / ID，不要删除旧命名空间。不要直接用上游 `_worker.js` 或面板覆盖本 fork：那会丢失本版本修改；同步上游时需要审查冲突及功能差异。
 

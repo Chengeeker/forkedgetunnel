@@ -7,6 +7,16 @@ GNU General Public License, version 2.
 
 # 开发记录
 
+## Windows Pages 删除重建部署（2026-11-07）
+
+- 用户明确要求按其项目实际操作方式自动“删除原 Pages 项目后重建”，不采用重新触发原项目的部署挂钩。新增 `redeploy-pages.cmd` 与 Windows PowerShell 5.1 脚本，使用 Cloudflare API 保留 GitHub 来源、构建设置、生产/预览变量、原 KV 绑定和自定义域名关联，然后构建原生产分支；不需要本机 Node、Git 或 Wrangler。首次创建项目仍沿用现有 README，不手动删除旧项目后再运行脚本。
+- 删除前读取配置、补齐 API 不可读的原密钥、核验所有原 KV ID；运行时按名称使用 KV 时分页查找并固定原 ID，不创建新 KV、不写 KV 数据。部署 Token 仅需 Pages 编辑和 KV 读取，与运行时 KV Token 分开，本机 DPAPI 加密整个状态，读回成功并留存备份后才允许删除。
+- 必须展示目标项目、GitHub 来源、分支及 KV，输入项目名确认才执行真实删除。删除会失去旧部署、挂钩和预览地址，服务会中断；Access 等项目外集成不在恢复范围，自定义域名需重新关联和等待证书。遇到非空未知绑定或 Wrangler 配置托管字段停止，不宣称通用项目完整克隆。
+- 状态区分 prepared/deleted/created/complete/failed：中断后恢复未完成步骤；删除请求响应丢失时读取原 ID，禁止误删新项目；创建响应丢失时需核对新 ID；构建成功以 deploy/success 为准，失败或超时不报成功。构建失败后修复 GitHub/配置，再执行新一轮重建确认。部署 Token 可通过 `refresh-pages-token.cmd` 更新；控制台改过密钥必须先用 `-RefreshSecrets` 刷新，否则 API 无法检测本机缓存已过时。
+- 请求只发往固定 Cloudflare API，禁跟随重定向、45 秒超时，错误不输出 API 响应正文；DELETE 仅允许精确的目标 Pages 项目路径，不支持删除命名空间。新旧项目 ID 不符即停止。脚本为 UTF-8 BOM，保持 Windows PowerShell 5.1 中文兼容；互斥锁避免同时运行两次。
+- 必要验证：`tests/pages-redeploy.test.ps1` 在 Windows PowerShell 5.1 运行，使用模拟 API 验证本机真实 DPAPI 保存/读取、隐藏密钥重填及缓存、原生及运行时 KV、域名恢复、创建失败续跑、删除响应丢失、项目 ID 冲突、失败部署不报成功。API 路径和请求格式对照 Cloudflare 官方项目/部署/域名接口。尚未使用真实账号删除重建，不能把模拟测试当作线上验收。
+- 本轮只新增本机部署工具、测试及使用说明，不改 Worker 传输、存储实现或 Pages 构建入口，不生成 APK。源码恢复可回到本次前提交 `23508d8`；项目配置的本地备份不等于已删除部署产物的恢复，不能承诺零停机回滚。
+
 ## README 按当前 fork 整理（2026-11-07）
 
 - 用户要求核对大量继承自上游、可能与当前 fork 不符的说明。本轮只修改文档：主 README、来源清单和本开发记录；不改代码、配置、存储或安装包。
