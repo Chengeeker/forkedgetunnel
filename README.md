@@ -29,7 +29,7 @@ GNU General Public License, version 2. See LICENSE for the complete text.
 
 - 🛡️ **协议支持**：支持 VLESS、Trojan、Shadowsocks 等主流协议，深度集成加密传输。
 - 📊 **管理面板**：内置可视化后台，支持实时配置修改、日志查看及流量统计。
-- 🛠️ **部署灵活**：完整适配 CF Workers 及 CF Pages (GitHub / 上传)，仓库已内置管理面板，Pages 部署无需再创建第二个项目。
+- 🛠️ **Pages + GitHub 部署**：仓库已内置管理面板，首次部署前填齐配置变量，首次使用后台配置时自动准备存储。
 - 🔄 **订阅系统**：内置自动订阅生成及混淆转换，适配主流客户端（Clash, Sing-box, Surge 等）。
 - ⚡ **性能加速**：支持自定义 ProxyIP、SOCKS5/HTTP 链式代理及优选 API，优化网络延迟。
 - 🏠 **可选家宽链式**：可在管理面板生成仅供 mihomo / Clash Meta 使用的 VPN Gate 志愿者节点链式订阅；它不保证住宅属性或稳定性，默认关闭。
@@ -39,65 +39,12 @@ GNU General Public License, version 2. See LICENSE for the complete text.
 
 ## 💡 快速部署
 
-**如果你只填写了 `ADMIN`，并看到“尚未配置持久化存储”，请先看 [Pages + GitHub 完整操作步骤](#pages-github-setup)。** `ADMIN` 只负责后台登录；使用自动准备存储的方式，还需要账号 ID、API Token 和固定的存储名称。首次部署前填齐即可；已经部署后补加变量，需要触发一次新部署加载新变量。
+本 README 只保留 [Pages 关联 GitHub 的部署教程](#pages-github-setup)。先准备账号 ID、API Token 和固定的存储名称，在**首次保存并部署前**与 `ADMIN` 一起填齐，再发布项目，首次使用配置时自动准备 KV。
 
->[!TIP]
-> 📖 **详尽图文教程**：[edgetunnel 部署指南](https://cmliussss.com/p/edt2/)
+**已经部署且只填了 `ADMIN` 的项目，请看 [已有项目补救步骤](#existing-pages-recovery)。** 补加变量后仍需重新部署，这属于旧部署缺少配置的补救流程，不是新项目的首次部署步骤。
 
 >[!WARNING]
 > ⚠️ **Error 1101问题**：[视频解析](https://www.youtube.com/watch?v=r4uVTEJptdE)
-
-### ⚙️ Workers 部署
-
-<details>
-<summary><code><strong>「 Workers 部署文字教程 」</strong></code></summary>
-
-1. 部署 CF Worker：
-   - 在 CF Worker 控制台中创建一个新的 Worker。
-   - 将 [worker.js](https://github.com/Chengeeker/forkedgetunnel/blob/main/_worker.js) 的内容粘贴到 Worker 编辑器中。
-   - 在左侧的 `设置`选项卡中，选择 `变量` > `添加变量`。
-     变量名称填写**ADMIN**，值则为你的管理员密码，后点击 `保存`即可。
-
-2. 绑定 KV 命名空间：
-   - 在 `绑定`选项卡中选择 `添加绑定 +` > `KV 命名空间` > `添加绑定`，然后选择一个已有的命名空间或创建一个新的命名空间进行绑定。
-   - `变量名称`填写**KV**，然后点击 `添加绑定`即可。
-   - 也可不添加原生绑定，改为按下方环境变量表填写账号、API Token 和固定的 `KV_NAMESPACE_NAME`，由程序首次使用配置时自动准备存储。
-
-3. 给 Workers绑定 自定义域： 
-   - 在 workers控制台的 `触发器`选项卡，下方点击 `添加自定义域`。
-   - 填入你已转入 CF 域名解析服务的次级域名，例如:`vless.google.com`后 点击`添加自定义域`，等待证书生效即可。
-
-4. 访问后台：
-   - 访问 `https://vless.google.com/admin` 输入管理员密码即可登录后台。
-
-</details>
-
-### 🛠 Pages 上传部署方法（手动绑定 KV） [图文教程](https://cmliussss.com/p/edt2/)
-
-<details>
-<summary><code><strong>「 Pages 上传文件部署文字教程 」</strong></code></summary>
-
-1. 部署 CF Pages：
-   - 下载 [main.zip](https://github.com/Chengeeker/forkedgetunnel/archive/refs/heads/main.zip) 文件，并点上 Star !!!
-   - 在 CF Pages 控制台中选择 `上传资产`后，为你的项目取名后点击 `创建项目`，然后上传你下载好的 [main.zip](https://github.com/Chengeeker/forkedgetunnel/archive/refs/heads/main.zip) 文件后点击 `部署站点`。
-   - 部署完成后点击 `继续处理站点` 后，选择 `设置` > `环境变量` > **制作**为生产环境定义变量 > `添加变量`。
-     变量名称填写**ADMIN**，值则为你的管理员密码，后点击 `保存`即可。
-   - 返回 `部署` 选项卡，在右下角点击 `创建新部署` 后，重新上传 [main.zip](https://github.com/Chengeeker/forkedgetunnel/archive/refs/heads/main.zip) 文件后点击 `保存并部署` 即可。
-
-2. 绑定 KV 命名空间：
-   - 在 `设置`选项卡中选择 `绑定` > `+ 添加` > `KV 命名空间`，然后选择一个已有的命名空间或创建一个新的命名空间进行绑定。
-   - `变量名称`填写**KV**，然后点击 `保存`后重试部署即可。
-
-3. 给 Pages绑定 CNAME自定义域：[视频教程](https://www.youtube.com/watch?v=LeT4jQUh8ok&t=851s)
-   - 在 Pages控制台的 `自定义域`选项卡，下方点击 `设置自定义域`。
-   - 填入你的自定义次级域名，注意不要使用你的根域名，例如：
-     您分配到的域名是 `fuck.cloudns.biz`，则添加自定义域填入 `lizi.fuck.cloudns.biz`即可；
-   - 按照 CF 的要求将返回你的域名DNS服务商，添加 该自定义域 `lizi`的 CNAME记录 `forkedgetunnel.pages.dev` 后，点击 `激活域`即可。
-   
-4. 访问后台：
-   - 访问 `https://lizi.fuck.cloudns.biz/admin` 输入管理员密码即可登录后台。
-
-</details>
 
 <a id="pages-github-setup"></a>
 
@@ -175,9 +122,11 @@ GNU General Public License, version 2. See LICENSE for the complete text.
    - 访问 `https://lizi.fuck.cloudns.biz/admin` 输入管理员密码即可登录后台。
    - 进入后台后修改一个设置并保存，重新打开后台确认仍被保留，即可检查存储是否工作。不要用“能打开登录页”来判断 KV 已创建，因为登录页不调用存储 API。
 
-#### 已经部署过，而且目前只填了 ADMIN
+<a id="existing-pages-recovery"></a>
 
-这种情况不需要重新创建 Pages 项目。保留原来的管理员密码，补齐另外三项：
+#### 已有项目补救：已经部署过，而且目前只填了 ADMIN
+
+本节只用于补救已发布但缺少配置的项目，仍需重新部署一次使新变量生效。新建项目按上面的首次部署步骤操作即可。保留已有项目和原来的管理员密码，补齐另外三项：
 
 1. 先按上面的准备步骤，取得账号 ID、创建 API Token，并确定存储名称；已有配置则复制原 KV 的 ID。
 2. 打开 **Workers & Pages → 你的 Pages 项目 → Settings（设置） → Variables and Secrets（变量和机密） → Add（添加）**。旧版界面可能显示为 **Environment variables（环境变量）**。
