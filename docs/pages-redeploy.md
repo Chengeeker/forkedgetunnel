@@ -1,6 +1,6 @@
 # Windows 初次 / 再次部署 Pages 脚本
 
-双击根目录的 **`redeploy-pages.cmd`**，先选择：
+[下载 Windows 部署包](https://github.com/Chengeeker/forkedgetunnel/releases/download/pages-deploy-v1.0.0/Pages-Deploy-Windows.zip)，完整解压后双击根目录的 **`redeploy-pages.cmd`**，先选择：
 
 ```text
 1：初次部署（创建新项目）
@@ -26,7 +26,7 @@
 
 ## 第一次运行
 
-1. [下载当前仓库 ZIP](https://github.com/Chengeeker/forkedgetunnel/archive/refs/heads/main.zip)，完整解压。不要只下载 `.cmd`，它需要同目录的 `scripts/redeploy-pages.ps1`。
+1. [下载 Pages-Deploy-Windows.zip](https://github.com/Chengeeker/forkedgetunnel/releases/download/pages-deploy-v1.0.0/Pages-Deploy-Windows.zip)，完整解压。包内根目录就是 `redeploy-pages.cmd`，配套的 `scripts/redeploy-pages.ps1` 已包含。不要在压缩包预览窗口里运行，也不要只复制一个 `.cmd`。已有完整源码仓库的用户也可直接运行仓库根目录同名文件。
 2. 为部署脚本准备 API Token。按 [新版 Token 创建教程](../README.md#kv-api-token) 进入账号策略，限定到目标账号。**初次部署需要 Cloudflare Pages → 编辑，以及 Workers KV 存储 → 编辑**，用于创建 KV；再次部署只需 Pages 编辑和 KV 读取（已有 KV 编辑权限也可）。英文对应 `Cloudflare Pages → Edit`、`Workers KV Storage → Edit / Read`。
 3. 双击脚本，选择 **1 或 2**，按提示填写项目名、Account ID 和部署 Token。已有本地配置时沿用原账号和 Token。
 4. 根据下述初次/再次流程补齐信息，检查目标后输入项目名确认，随后自动执行并等待部署结果。
@@ -91,7 +91,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\redeploy-pages
 
 这表示 Cloudflare 仍检测到项目的自定义域名关联，需要先解除关联才能删除项目。旧脚本漏了这一步，只备份域名并安排重建后恢复，因此会在这里停止；无需为此更换 KV ID 或重新创建命名空间。
 
-1. [重新下载最新版 ZIP](https://github.com/Chengeeker/forkedgetunnel/archive/refs/heads/main.zip) 并完整解压，在原电脑、原 Windows 用户下双击 `redeploy-pages.cmd`。
+1. [下载包含修复的部署包](https://github.com/Chengeeker/forkedgetunnel/releases/download/pages-deploy-v1.0.0/Pages-Deploy-Windows.zip) 并完整解压，在原电脑、原 Windows 用户下双击 `redeploy-pages.cmd`。
 2. 脚本读取本机已有的 `prepared` 恢复记录，自动继续：备份当前域名列表、解除关联、删除重建、恢复原域名。此时不再显示初次/再次选择菜单。
 3. 不要提前手动删除项目，也不要清空 `%LOCALAPPDATA%\forkedgetunnel\PagesRedeploy`；其中保存了恢复配置所需的加密数据。
 

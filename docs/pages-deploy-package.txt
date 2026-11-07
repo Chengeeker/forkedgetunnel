@@ -1,0 +1,36 @@
+﻿forkedgetunnel Windows 一键部署包
+
+先完整解压 ZIP，再双击 redeploy-pages.cmd。
+不要在压缩包预览窗口中直接运行，也不要只复制一个 CMD。
+
+1：初次部署——创建 Pages 项目，自动创建或复用 KV 并绑定。
+2：再次部署——备份原配置，保留原 KV，解除自定义域名关联，删除并重建同名 Pages 项目，再恢复域名。
+
+项目名称示例：my-tunnel
+正确：my-tunnel
+错误：https://my-tunnel.pages.dev/admin、my-tunnel.pages.dev、我的项目
+再次部署填写 Cloudflare Workers & Pages 中原项目的名称，不一定等于 GitHub 仓库名。
+
+首次运行准备：
+- Cloudflare Account ID（账号 ID，不是邮箱或 Zone ID）。
+- 部署 API Token：目标账号的 Cloudflare Pages 编辑权限；初次创建 KV 需 KV 编辑，再次部署需 KV 读取（KV 编辑也可）。
+- 初次部署还需 GitHub 用户名/仓库名、分支、ADMIN 密码；仓库必须已在 Cloudflare 完成 GitHub 授权。
+- 再次部署可能需要填写 ADMIN、运行时 KV Token 等原加密变量值。不要把 Token 发给别人。
+
+Token 过期或需要替换：双击 refresh-pages-token.cmd。
+中途失败：原电脑、原 Windows 用户重新运行 redeploy-pages.cmd，自动继续恢复。
+备份位于 %LOCALAPPDATA%\forkedgetunnel\PagesRedeploy；不要手动清空，也不要提前删除原项目或 KV。
+
+再次部署期间服务会中断，旧部署历史、预览地址和部署挂钩不保留；域名恢复和证书生效可能需要等待。
+脚本不删除 KV 数据、不调用 DNS 记录修改接口。Access 等项目外策略不在自动恢复范围。
+代码在 Cloudflare 从你关联的 GitHub 仓库构建；这个包不是离线上传整套 Worker 源码的工具。
+Windows 自带的 PowerShell 即可使用，不需要安装 Git、Node.js 或 Wrangler。
+
+完整步骤及权限图文对应说明：
+https://github.com/Chengeeker/forkedgetunnel/blob/main/docs/pages-redeploy.md
+
+这个包用于 Cloudflare Pages 部署。
+如果要在 Windows 上本地优选 IP，请下载另一个 CFData-Local-Windows 包：
+https://github.com/Chengeeker/forkedgetunnel/releases/tag/local-cfdata-v1.0.0
+
+本部署脚本采用 GPL-2.0，配套源码 scripts/redeploy-pages.ps1 和 LICENSE 已包含在包内。

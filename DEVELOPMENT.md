@@ -7,6 +7,13 @@ GNU General Public License, version 2.
 
 # 开发记录
 
+## Windows 部署包加入 GitHub 发行版（2026-11-07）
+
+- 用户指出发行版只有 CFData 本地优选包，普通用户找不到部署 CMD。新增独立 Pages-Deploy-Windows.zip：根目录提供 redeploy-pages.cmd、refresh-pages-token.cmd、使用说明.txt、LICENSE，scripts/redeploy-pages.ps1 保持原相对路径。CMD 依赖脚本，不能只上传一个无法独立运行的入口；不引入在线下载执行器或修改部署逻辑。
+- scripts/build-pages-deploy.ps1 使用固定文件白名单直接生成 ZIP 和 SHA256SUMS.txt，不递归打包工作区，不收录 Token、DPAPI 恢复记录、测试文件或缓存。使用系统 PowerShell/.NET，无额外依赖；保留部署脚本的 UTF-8 BOM。部署工具与 CFData 是独立用途、独立包和许可证。
+- 新增 pages-deploy-v* 标签触发的 Windows release 工作流：先执行模拟 API 的部署恢复回归、再检查 ZIP 文件清单/源码字节/入口路径/BOM/校验和，通过后发布部署包及 SHA256SUMS。首次发布标签 pages-deploy-v1.0.0，README、部署指南及发行说明直接列出部署包下载和根目录 CMD；保留 CFData 入口，明确需要本地优选时下载哪个包。后续部署脚本变更须发布新的 pages-deploy-v* 标签并同步版本下载链接，不能误把更新 main 当作旧 ZIP 自动更新。
+- 本地 Windows PowerShell 5.1 打包检查和部署脚本模拟回归通过；发布后需核对 Actions 结果、公开资产、校验和及压缩包中脚本与标签源码一致。无 Worker/管理面板改动，无 APK 目标，不执行用户 Cloudflare 账号的创建、删除或真实部署。
+
 ## 自定义地址入口与优选输入、导入对应关系（2026-11-07）
 
 - 用户反馈外部优选域名粘贴后初筛会变掉、导入顺序不对应，并要求地址库可选自定义。用用户给出的三行域名格式复现 `prepareCandidates` 将明确输入随机洗牌，`startLatencyRun` 再把规范化候选写回编辑器，导致原顺序、备注丢失；`selectedResults` 取内部延迟数组顺序，未跟随表头排序。旧测试只验证单条域名往返，没覆盖完整初筛入口和排序后批量导入。

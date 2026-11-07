@@ -1,0 +1,40 @@
+name: Windows Pages deployment package
+on:
+  push:
+    tags:
+      - 'pages-deploy-v*'
+permissions:
+  contents: write
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test deployment recovery without cloud requests
+        shell: powershell
+        run: ./tests/pages-redeploy.test.ps1
+      - name: Build and verify the complete CMD package
+        shell: powershell
+        run: ./tests/pages-deploy-package.test.ps1
+      - uses: softprops/action-gh-release@v2
+        with:
+          name: Windows 一键部署 Pages（初次 / 再次部署）${{ github.ref_name }}
+          make_latest: true
+          body: |
+            **部署 Cloudflare 项目，请下载下面的 `Pages-Deploy-Windows.zip`。**
+
+            完整解压后，双击根目录的 **`redeploy-pages.cmd`**。输入 1 初次部署；输入 2 再次部署，保留原 KV，备份后删除重建项目。配套 PowerShell 脚本和中文使用说明已经包含，不用再去源码里找 CMD。
+
+            不要在压缩包内直接运行，不要只复制一个 CMD。Token 更新使用 `refresh-pages-token.cmd`。系统自带 Windows PowerShell 即可，不需要安装 Git、Node.js 或 Wrangler。
+
+            再次部署会暂时中断服务，旧部署历史和挂钩不保留；自定义域名会先解除关联、重建后恢复，证书可能需要等待。中断后重新运行可继续恢复，不要删除 KV 或本机加密备份。
+
+            [完整部署教程与 Token 权限说明](https://github.com/Chengeeker/forkedgetunnel/blob/main/docs/pages-redeploy.md)
+
+            **本地优选 IP 是另一个工具**：[CFData Windows 启动包](https://github.com/Chengeeker/forkedgetunnel/releases/tag/local-cfdata-v1.0.0)。不要把它当作 Cloudflare 部署包。
+
+            此 ZIP 是部署工具；Cloudflare 从你关联的 GitHub 仓库构建项目代码。GPL-2.0 脚本源码与许可证已包含。附带 SHA256SUMS.txt 供校验。
+          files: |
+            build/pages-deploy/release/Pages-Deploy-Windows.zip
+            build/pages-deploy/release/SHA256SUMS.txt
+          fail_on_unmatched_files: true
