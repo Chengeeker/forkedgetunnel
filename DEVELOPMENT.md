@@ -1,11 +1,21 @@
 <!--
 forkedgetunnel development record.
 This document records modifications and additions made by Chengeeker on
-2026-09-30 to the upstream edgetunnel project. See ../LICENSE for the
+2026-09-30 to the upstream edgetunnel project. See LICENSE for the
 GNU General Public License, version 2.
 -->
 
 # 开发记录
+
+## README 按当前 fork 整理（2026-11-07）
+
+- 用户要求核对大量继承自上游、可能与当前 fork 不符的说明。本轮只修改文档：主 README、来源清单和本开发记录；不改代码、配置、存储或安装包。
+- 删除上游演示站、视频部署入口、上游自动生成问答站、无逐项验收依据的跨平台客户端推荐表、赞助推广和旧后台截图。明确本教程只覆盖 Pages 关联 GitHub，保留三个既有稳定锚点及实际 Chrome 核对过的新版 Token 操作，不恢复已撤下的 Workers 粘贴/Pages 上传教程。
+- 自定义域名示例改为占位地址并指向平台实际分配的 Pages 主机名，不再沿用“根域名不可用”的上游说法。保留首次部署前填齐四项、运行时初始化 KV、旧部署补变量仍须发布、原生绑定优先及原命名空间复用的说明。构建仍只复制运行资源，不能回退为构建期自动绑定的旧方案。
+- 补齐优选结果导入后的关键顺序：追加到自定义地址不等于保存，须选择“自定义订阅（支持汇聚订阅）”、保存并在客户端更新。区分在线解析 IP 测量、本机 mihomo 真实延迟和 CFData 本地扫描；CFData 结果目前手动复制，Android 仅导入订阅，不承诺自动回传或零安装。
+- 对照当前默认配置、入口和链式参数解析修正环境变量表：移除弱密码/上游密钥示例；说明 UUID 是确定性派生，固定 UUID 不固定域名变化后的 Token；OFF_LOG 只关闭本项目 KV 日志；BEST_SUB 有特定请求条件；并发增加不保证加速。链式示例使用远端占位域名，修正 HTTP 全局模式误写为 SOCKS5，避免将 Worker 的回环地址误认为 Windows 本机。
+- 保留开源来源与 GPL 声明，上游历史引用完整移至 ACKNOWLEDGEMENTS.md，新增本 fork 使用的组件/数据来源；明确 CHANGELOG 是上游记录，本文件才记录 fork 改动。1101 排错沿用已核对结论，不把同名上游版本标题当作实际异常修复证据。
+- 核验范围为源码/面板字段、部署脚本、现有开发记录及 Cloudflare 官方文档，检查本地链接、显式锚点、折叠/代码块配对和 git diff --check。文档变更不重建 Worker/Windows 包、不生成 APK、不重新部署或进行真实网络/客户端验收；无运行时性能影响。后续更改 UI 文案、默认值、部署方式或来源时必须同步这些说明。
 
 ## Windows 本地 CFData-WEB 启动接入（2026-11-07）
 
@@ -222,12 +232,12 @@ GNU General Public License, version 2.
 
 ## 当前部署顺序
 
-现在只需要部署一个项目：
+以 README 的 [Pages + GitHub 教程](./README.md#pages-github-setup) 为准，只部署一个项目。此节按 2026-11-07 当前流程更新，替代最初“发布后再绑定 KV”的顺序：
 
-1. 在 GitHub 上选择自己的 `forkedgetunnel` 仓库，在 Cloudflare Pages 中使用“连接到 Git”创建项目，生产分支选择 `main`，构建设置沿用原项目。
-2. 在 Pages 的生产环境变量中设置 `ADMIN`，并绑定 KV 命名空间，绑定名称必须是 `KV`。
-3. 保存并部署后访问主域名的 `/admin`。登录页和在线优选页面都来自同一个仓库，速度列旁边应显示“一键测速”。
-4. `EDT_PAGES_URL` 不需要填写。只有当使用普通 Worker（没有 Pages `ASSETS` 绑定），或者明确要使用另一个外部面板时，才填写外部面板根地址，且不要包含 `/admin`。
+1. 在 Cloudflare Pages 中连接自己的 GitHub 仓库，生产分支选 `main`，框架选 `None`，构建命令为 `node scripts/prepare-pages.cjs`，输出目录为 `dist`，使用 Node.js 20+。
+2. 首次保存并部署前填齐 `ADMIN`、`CLOUDFLARE_ACCOUNT_ID`、加密的 `CLOUDFLARE_API_TOKEN`、固定 `KV_NAMESPACE_NAME`；已有数据用原 `KV_NAMESPACE_ID` 替代名称。已有原生 `KV` 绑定则继续优先使用它，无需改动存储方式。
+3. 发布后访问 `/admin`，首次鉴权读取配置时自动创建/复用 KV；保存后重开验证持久化。运行时 API 读写不等于向平台添加原生绑定。已发布且只填了 `ADMIN` 的旧部署，补变量后仍需一次新部署。
+4. `EDT_PAGES_URL` 留空使用当前仓库面板；外部面板仅作为兼容入口，可能没有本 fork 新功能。优选结果导入后选择自定义订阅模式、保存并在客户端更新。
 
 原先“主程序一个 Pages 项目、面板一个 Pages 项目、再配置 `EDT_PAGES_URL`”的流程已被当前合并方案取代；这条旧流程只作为兼容回退，不是新部署的必需步骤。
 

@@ -6,49 +6,36 @@ The Worker and web source use GNU GPL version 2; see LICENSE.
 The independent local-cfdata launcher uses GPL-3.0-or-later; see its LICENSE.
 -->
 
-# 🚀 forkedgetunnel 2.1
-![后台页面](./img.png)
+# forkedgetunnel
 
 [![Stars](https://img.shields.io/github/stars/Chengeeker/forkedgetunnel?style=flat-square&logo=github)](https://github.com/Chengeeker/forkedgetunnel/stargazers)
-[![Forks](https://img.shields.io/github/forks/Chengeeker/forkedgetunnel?style=flat-square&logo=github)](https://github.com/Chengeeker/forkedgetunnel/network/members)
-[![License](https://img.shields.io/github/license/Chengeeker/forkedgetunnel?style=flat-square)](https://github.com/Chengeeker/forkedgetunnel/blob/main/LICENSE)
-[![Telegram](https://img.shields.io/badge/Telegram-Group-blue?style=flat-square&logo=telegram)](https://t.me/+FA4BSZ0P0uQwZDI1)
-[![YouTube](https://img.shields.io/badge/YouTube-Channel-red?style=flat-square&logo=youtube)](https://www.youtube.com/watch?v=LeT4jQUh8ok)
-[![zread](https://img.shields.io/badge/Ask_Zread-_.svg?style=flat-square&color=00b0aa&labelColor=000000&logo=data%3Aimage%2Fsvg%2Bxml%3Bbase64%2CPHN2ZyB3aWR0aD0iMTYiIGhlaWdodD0iMTYiIHZpZXdCb3g9IjAgMCAxNiAxNiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTQuOTYxNTYgMS42MDAxSDIuMjQxNTZDMS44ODgxIDEuNjAwMSAxLjYwMTU2IDEuODg2NjQgMS42MDE1NiAyLjI0MDFWNC45NjAxQzEuNjAxNTYgNS4zMTM1NiAxLjg4ODEgNS42MDAxIDIuMjQxNTYgNS42MDAxSDQuOTYxNTZDNS4zMTUwMiA1LjYwMDEgNS42MDE1NiA1LjMxMzU2IDUuNjAxNTYgNC45NjAxVjIuMjQwMUM1LjYwMTU2IDEuODg2NjQgNS4zMTUwMiAxLjYwMDEgNC45NjE1NiAxLjYwMDFaIiBmaWxsPSIjZmZmIi8%2BCjxwYXRoIGQ9Ik00Ljk2MTU2IDEwLjM5OTlIMi4yNDE1NkMxLjg4ODEgMTAuMzk5OSAxLjYwMTU2IDEwLjY4NjQgMS42MDE1NiAxMS4wMzk5VjEzLjc1OTlDMS42MDE1NiAxNC4xMTM0IDEuODg4MSAxNC4zOTk5IDIuMjQxNTYgMTQuMzk5OUg0Ljk2MTU2QzUuMzE1MDIgMTQuMzk5OSA1LjYwMTU2IDE0LjExMzQgNS42MDE1NiAxMy43NTk5VjExLjAzOTlDNS42MDE1NiAxMC42ODY0IDUuMzE1MDIgMTAuMzk5OSA0Ljk2MTU2IDEwLjM5OTlaIiBmaWxsPSIjZmZmIi8%2BCjxwYXRoIGQ9Ik0xMy43NTg0IDEuNjAwMUgxMS4wMzg0QzEwLjY4NSAxLjYwMDEgMTAuMzk4NCAxLjg4NjY0IDEwLjM5ODQgMi4yNDAxVjQuOTYwMUMxMC4zOTg0IDUuMzEzNTYgMTAuNjg1IDUuNjAwMSAxMS4wMzg0IDUuNjAwMUgxMy43NTg0QzE0LjExMTkgNS42MDAxIDE0LjM5ODQgNS4zMTM1NiAxNC4zOTg0IDQuOTYwMVYyLjI0MDFDMTQuMzk4NCAxLjg4NjY0IDE0LjExMTkgMS42MDAxIDEzLjc1ODQgMS42MDAxWiIgZmlsbD0iI2ZmZiIvPgo8cGF0aCBkPSJNNCAxMkwxMiA0TDQgMTJaIiBmaWxsPSIjZmZmIi8%2BCjxwYXRoIGQ9Ik00IDEyTDEyIDQiIHN0cm9rZT0iI2ZmZiIgc3Ryb2tlLXdpZHRoPSIxLjUiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPgo8L3N2Zz4K&logoColor=ffffff)](https://zread.ai/cmliu/edgetunnel)
-[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/cmliu/edgetunnel)
+[![License](https://img.shields.io/github/license/Chengeeker/forkedgetunnel?style=flat-square)](./LICENSE)
 
----
+基于 [cmliu/edgetunnel](https://github.com/cmliu/edgetunnel) 修改的 Cloudflare Worker / Pages 隧道与订阅管理项目。**本 README 按当前 fork 核对（2026-11-07），部署教程仅针对 Pages 关联 GitHub。** 上游教程、演示站和客户端推荐表不能代替本版本的操作说明或兼容性验证。
 
-## 📖 项目简介
+当前版本包含：
 
-**forkedgetunnel** 是一个基于 CF Workers/Pages 平台的边缘计算隧道解密方案。它能够高效地处理网络流量，并提供强大的管理面板和灵活的节点配置能力。
+- 同仓库部署 Worker、管理面板和登录页，不需要另建面板项目。
+- 首次部署填齐环境变量后，运行时自动创建或复用 KV，无需补绑后再部署。
+- VLESS、Trojan、Shadowsocks 节点及订阅生成；支持 ProxyIP 和链式代理配置。
+- 在线 IP / 域名解析优选、批量测速、排序及勾选导入；本地 Clash 实测是独立验证入口。
+- Windows 本地 CFData-WEB 启动器；Android 可导入配置好的订阅，无需安装本地组件。
+- 默认关闭的 VPN Gate 志愿者节点链式订阅，仅面向指定版本的 mihomo / Clash Meta。
 
-- 🖥️ **Demo 演示站点**：[https://EDT-Pages.github.io/admin](https://EDT-Pages.github.io/admin)
+功能和网络结果取决于客户端、Cloudflare 及外部服务。中文内部命名和请求处理调整不保证代理流量无法被识别；面板中的平台用量或请求统计也不等于真实代理流量计费。
 
-### ✨ 核心特性
+## 使用顺序
 
-- 🛡️ **协议支持**：支持 VLESS、Trojan、Shadowsocks 等主流协议，深度集成加密传输。
-- 📊 **管理面板**：内置可视化后台，支持实时配置修改、日志查看及流量统计。
-- 🛠️ **Pages + GitHub 部署**：仓库已内置管理面板，首次部署前填齐配置变量，首次使用后台配置时自动准备存储。
-- 🔄 **订阅系统**：内置自动订阅生成及混淆转换，适配主流客户端（Clash, Sing-box, Surge 等）。
-- ⚡ **性能加速**：支持自定义 ProxyIP、SOCKS5/HTTP 链式代理及优选 API，优化网络延迟。
-- 🏠 **可选家宽链式**：可在管理面板生成仅供 mihomo / Clash Meta 使用的 VPN Gate 志愿者节点链式订阅；它不保证住宅属性或稳定性，默认关闭。
-- 🌐 **多台适配**：完美适配 Windows, Android, iOS, MacOS 及各种软路由固件。
+1. [Pages + GitHub 首次部署](#pages-github-setup)：先准备账号 ID、API Token 和固定存储名称，再与 `ADMIN` 一起填入首次部署。
+2. [首次使用与订阅](#first-use)：确认保存成功，选择订阅模式，再导入客户端。
+3. [在线优选 IP / 域名](#online-optimize) 或 [Windows 本地优选](#windows-cfdata)：测试后使用自定义订阅模式保存结果。
+4. 需要调整配置时查看 [环境变量](#environment-variables)、[升级与排错](#maintenance)。
 
----
-
-## 💡 快速部署
-
-本 README 只保留 [Pages 关联 GitHub 的部署教程](#pages-github-setup)。先准备账号 ID、API Token 和固定的存储名称，在**首次保存并部署前**与 `ADMIN` 一起填齐，再发布项目，首次使用配置时自动准备 KV。
-
-**已经部署且只填了 `ADMIN` 的项目，请看 [已有项目补救步骤](#existing-pages-recovery)。** 补加变量后仍需重新部署，这属于旧部署缺少配置的补救流程，不是新项目的首次部署步骤。
-
->[!WARNING]
-> ⚠️ **Error 1101问题**：[视频解析](https://www.youtube.com/watch?v=r4uVTEJptdE)
+**已经部署且只填了 `ADMIN` 的项目，请按 [已有项目补救步骤](#existing-pages-recovery) 操作。** 旧部署补变量后仍需一次新部署；首次填齐的项目无需补绑再部署。
 
 <a id="pages-github-setup"></a>
 
-### 🛠 Pages + GitHub 部署方法（首次填变量，无需手动绑定 KV）
+## Pages + GitHub 部署（首次填齐，无需手动绑定 KV）
 
 <details open>
 <summary><code><strong>「 Pages + GitHub 部署文字教程 」</strong></code></summary>
@@ -91,8 +78,8 @@ The independent local-cfdata launcher uses GPL-3.0-or-later; see its LICENSE.
 #### 新建 Pages 项目：首次保存并部署前填齐
 
 1. 部署 CF Pages：
-   - 在 Github 上先 Fork 本项目，并点上 Star !!!
-   - 在 CF Pages 控制台中选择 `连接到 Git` 后，选中你自己的 `forkedgetunnel` 仓库，进入构建设置。框架选择 `None`，构建命令填写 `node scripts/prepare-pages.cjs`，构建输出目录填写 `dist`，根目录保留仓库根目录；使用 V2 或更新的构建系统及 Node.js 20 或以上版本。
+   - 在 GitHub 上 Fork [本仓库](https://github.com/Chengeeker/forkedgetunnel)，使用自己的仓库作为部署来源。
+   - 在 CF Pages 控制台中选择 `连接到 Git` 后，选中你自己的 `forkedgetunnel` 仓库，进入构建设置，生产分支选择 `main`。框架选择 `None`，构建命令填写 `node scripts/prepare-pages.cjs`，构建输出目录填写 `dist`，根目录保留仓库根目录；使用 V2 或更新的构建系统及 Node.js 20 或以上版本。
    - 在**首次保存并部署前**展开 **Environment variables（环境变量）**，逐项添加下表四个变量。变量名按表格原样填写，不带空格；不要新增名为 `KV` 的普通文本变量：
 
      | 变量名 | 值填写什么 | 保存方式 |
@@ -112,15 +99,11 @@ The independent local-cfdata launcher uses GPL-3.0-or-later; see its LICENSE.
    - API 方式作为缺少原生绑定时的备用路径，后台和订阅读写会比原生 KV 多一次管理 API 调用并占用 API 额度；代理数据包的转发不经过它。以后添加原生绑定时，应选择同一命名空间以保留配置。
    - 本仓库已验证无原生绑定的完整登录、保存、重开及本地 workerd 运行，真实账号的创建权限和网络仍需首次运行确认。依据：[创建 KV 命名空间](https://developers.cloudflare.com/api/resources/kv/subresources/namespaces/methods/create/)、[KV 值读写 API](https://developers.cloudflare.com/api/resources/kv/subresources/namespaces/subresources/values/)。
 
-3. 给 Pages绑定 CNAME自定义域：[视频教程](https://www.youtube.com/watch?v=LeT4jQUh8ok&t=851s)
-   - 在 Pages控制台的 `自定义域`选项卡，下方点击 `设置自定义域`。
-   - 填入你的自定义次级域名，注意不要使用你的根域名，例如：
-     您分配到的域名是 `fuck.cloudns.biz`，则添加自定义域填入 `lizi.fuck.cloudns.biz`即可；
-   - 按照 CF 的要求将返回你的域名DNS服务商，添加 该自定义域 `lizi`的 CNAME记录 `forkedgetunnel.pages.dev` 后，点击 `激活域`即可。
+3. 可选：绑定自定义域名。
+   - 在 Pages 项目的 **自定义域** 中添加你自己的域名，例如 `proxy.example.com`，按控制台提示配置 DNS 并等待证书就绪。
+   - 使用控制台实际分配的 `<你的项目>.pages.dev` 地址，不要照抄其他项目的域名。根域名与子域名的 DNS 要求不同，按 [Cloudflare 自定义域名说明](https://developers.cloudflare.com/pages/configuration/custom-domains/) 操作。
 
-4. 访问后台：
-   - 访问 `https://lizi.fuck.cloudns.biz/admin` 输入管理员密码即可登录后台。
-   - 进入后台后修改一个设置并保存，重新打开后台确认仍被保留，即可检查存储是否工作。不要用“能打开登录页”来判断 KV 已创建，因为登录页不调用存储 API。
+4. 访问 `https://<部署域名>/admin` 输入管理员密码，继续下面的 [首次使用与订阅](#first-use)。修改一项设置、保存后重新打开，确认持久化正常；只打开登录页不会创建 KV。
 
 <a id="existing-pages-recovery"></a>
 
@@ -149,152 +132,120 @@ Pages 变量、加密选项和部署生效规则见 [Cloudflare 官方说明](ht
 
 </details>
 
----
+<a id="first-use"></a>
 
-## 🌐 在线优选 IP 和域名
+## 首次使用与订阅
 
-1. 在“在线优选域名”外部站点复制结果，回到“在线优选 IP”，粘贴到**待选列表（IP / 域名）**。支持每行一个 `example.com`、`example.com:443#备注`，也可混合 IPv4、IPv6、CIDR 和 IP 区间；域名未指定端口时默认使用 443（高级设置指定其他端口时使用该端口）。
-2. 点击 **HTTPS 初筛**。域名通过 Cloudflare DNS（失败时尝试 Google DNS）的 A / AAAA 记录解析后，最多尝试四个地址，取首个可测地址继续现有测速流程；同一轮复用解析结果。结果会标注“域名解析 IP”，延迟和下载速度代表当时解析到的 IP 经优选服务的路径，不等于域名自身网页、以后 DNS 结果或完整代理连接的性能。
-3. 对初筛结果执行**一键测速**，点击延迟或速度表头排序，勾选需要的结果（可全选），点击 **导入到优选列表**。原域名和端口会追加到管理面板的“自定义优选地址”；检查后按面板原有方式保存配置。
+1. 打开部署域名的 `/admin`，输入 `ADMIN` 密码。修改一项配置、保存并重新打开页面，确认数据仍在；登录页能打开不代表存储已就绪。
+2. 检查协议、传输和优选订阅设置。新配置默认使用 **VLESS、WebSocket、ECH 开启、随机优选 16 个地址**，订阅名称为 `forkedgetunnel`；反代设置中的初始 ProxyIP 为 `proxyip.cmliussss.net`。已有配置、环境变量及手动修改可能覆盖这些值，以面板实际显示为准。
+3. 使用自己的地址或优选结果时，将 **优选订阅模式** 设为 **自定义订阅（支持汇聚订阅）**，检查“自定义优选地址”后保存。随机优选模式不会按这份自定义列表下发节点。
+4. 在“获取节点链接”中复制客户端对应的链接，例如普通节点/订阅、Clash 订阅或 Sing-box 订阅。更改配置后，在客户端更新订阅；仅刷新管理页面不会更新客户端已导入的节点。
 
-IP 库独立于线路检测显示。**CF 官方网段 v4/v6（内置）**可直接导入，网段快照核对日期为 2026-11-07，来源为 [Cloudflare IPv4](https://www.cloudflare.com/ips-v4) 和 [IPv6](https://www.cloudflare.com/ips-v6)。检测失败时仍可编辑、导入和使用本地 Clash 实测；点击 HTTPS 初筛可重试。在线初筛与下载测速仍需至少一个优选服务可访问，失败不会被标成测速成功。
+客户端需要支持所选协议、传输及 ECH 等参数。本仓库没有对全部平台和客户端版本完成逐项验收，因此不提供“全平台完美适配”的承诺。部分订阅格式依赖面板配置的外部订阅转换服务；转换服务会处理节点连接参数，使用前应确认服务来源可信。
 
----
+<a id="online-optimize"></a>
 
-## 💻 Windows 本地优选（CFData-WEB）
+## 在线优选 IP 和域名
 
-“本地优选IP”现在会唤起 Windows 本机的 CFData-WEB，并在浏览器打开 `http://127.0.0.1:13336`。
+1. 可自行输入地址，也可在“在线优选域名”打开的[外部站点](https://bestcf.fxxk.dedyn.io/)复制结果，回到“在线优选 IP”，粘贴到 **待选列表（IP / 域名）**。支持每行一个 `example.com`、`example.com:443#备注`，也可混合 IPv4、IPv6、CIDR 和 IP 区间。请输入地址，不要粘贴整段网页或带 `https://` 的网页 URL。域名未指定端口时默认使用 443；高级设置指定其他端口时使用该端口。
+2. 点击 **HTTPS 初筛**。域名经 Cloudflare DNS（失败时尝试 Google DNS）解析 A / AAAA 记录，最多尝试四个地址，取首个可测地址继续测速，同一轮复用解析结果。结果标注“域名解析 IP”：数值代表当时解析 IP 经优选服务的路径，不等于域名自身网页、未来 DNS 结果或完整代理连接的性能。
+3. 对初筛结果执行 **一键测速**，点击延迟或速度表头排序，勾选需要的结果（可全选），点击 **导入到优选列表**。原域名和端口会追加到管理面板的“自定义优选地址”，此时还没有保存到 KV。
+4. 将 **优选订阅模式** 设为 **自定义订阅（支持汇聚订阅）**，检查列表并保存，再到客户端更新订阅。
 
-首次使用请[下载 Windows 启动包](https://github.com/Chengeeker/forkedgetunnel/releases/download/local-cfdata-v1.0.0/CFData-Local-Windows-1.0.0.zip)，解压后双击 `install.cmd`。安装完成会自动打开本地页面；以后直接点管理面板的“本地优选IP”即可。浏览器首次询问是否打开本机程序时，需要确认；网页不能代替用户完成首次安装。
+IP 库独立于线路检测显示。**CF 官方网段 v4/v6（内置）**可直接导入，快照核对日期为 2026-11-07，来源为 [Cloudflare IPv4](https://www.cloudflare.com/ips-v4) 和 [IPv6](https://www.cloudflare.com/ips-v6)；导入网段不表示其中所有地址均可用。检测失败时仍可编辑、导入和使用本地 Clash 实测；点击 HTTPS 初筛可重试。在线初筛与下载测速依赖外部优选服务，服务失败不能据此判断本机线路不可用，也不会被标成测速成功。
 
-支持 Windows x64 / ARM64，只监听本机，不设置开机自启。重复点击会复用已有服务；使用结束可运行启动包中的 `stop.cmd`。选出的结果可复制回管理面板的自定义优选地址，保存配置后安卓导入订阅链接即可。详细信息见 [本地启动器说明](./local-cfdata/README.md)。
+**本地 Clash 实测**通过本机 mihomo 的 external-controller 接口测试真实节点延迟，与在线优选服务的下载测速不同。需要自行运行并配置内核控制接口、密钥和允许的网页来源，且可能需要浏览器本地网络访问授权；按面板内说明操作，不要将控制接口开放到公网。在线测速有速度不代表客户端代理连接一定可用，必要时使用此入口及客户端日志检查实际连接。
 
----
+<a id="windows-cfdata"></a>
 
-## 🏠 可选免费家宽链式
+## Windows 本地优选（CFData-WEB）
 
-部署完成并登录管理面板后，打开单独的「🏠 免费家宽链式」设置模块，勾选「开启免费家宽链式」并保存，顶部的订阅链接区域会显示单独的「Clash 家宽订阅」。复制这条链接，在 mihomo / Clash Meta 1.19.25+ 中作为配置文件或订阅配置导入；不要把它当作普通 VLESS 节点链接使用。导入后，在「🚀 节点选择」中选择「🏠 家宽自动」即可开始使用，需要手动挑选时再进入「🏠 家宽节点」。这个订阅使用当前 CF 节点作为前置，通过 mihomo 的 `dialer-proxy` 将 TCP OpenVPN 连接转发到 VPN Gate 的公开志愿者节点。
+“本地优选IP”会唤起 Windows 本机的 **CFData-WEB v1.8.5**，并在浏览器打开 `http://127.0.0.1:13336`。
 
-请注意：这里的“免费家宽”不是 Cloudflare 提供的住宅网络，也不保证出口一定是家庭宽带；VPN Gate 节点由志愿者共享，可能掉线、拥挤或属于非住宅网络，运营者也可能观察经过其节点的流量。它只面向 mihomo / Clash Meta 1.19.25 及以上版本，当前只生成 TCP 链路，普通订阅和其他客户端订阅不受影响。不开启时，Worker 不会请求 VPN Gate 节点清单。
+1. 首次使用[下载 Windows 启动包](https://github.com/Chengeeker/forkedgetunnel/releases/download/local-cfdata-v1.0.0/CFData-Local-Windows-1.0.0.zip)，解压后双击 `install.cmd`。安装完成会自动打开本地页面。
+2. 以后直接点管理面板的“本地优选IP”。浏览器首次询问是否打开本机程序时需要确认；网页不能代替首次安装。
+3. 在本地页面完成优选，将结果**手动复制**回管理面板的“自定义优选地址”，选择自定义订阅模式并保存，再在客户端更新订阅。当前不会自动回传 CFData 结果。
 
----
+支持 Windows x64 / ARM64，安装到当前用户的 `%LOCALAPPDATA%\forkedgetunnel\CFData`，只监听本机，不设置开机自启。重复点击复用已有服务，使用结束可运行启动包中的 `stop.cmd`。Android 直接导入配置好的订阅链接，不提供 Android 本机启动器。安装、停止、卸载及构建详见 [本地启动器说明](./local-cfdata/README.md)。
 
-## 🔑 环境变量说明
+## 可选免费家宽链式
 
-| 变量名 | 必填 | 示例 | 详细备注 |
-| :--- | :---: | :--- | :--- |
-| **ADMIN** | ✅ | `123456` | 后台管理面板登录密码 |
-| **KEY** | ❌ | `CMLiussss` | 快速订阅路径密钥，访问 `/CMLiussss` 即可快速获取节点 |
-| **UUID** | ❌ | `90cd4a77-141a-43c9-991b-08263cfe9c10` | 强制固定UUID，只支持**UUIDv4**标准格式 |
-| **CLOUDFLARE_ACCOUNT_ID** | 无原生 KV 时填写 | 当前账号 ID | 与 API Token 配套，供运行时配置存储使用 |
-| **CLOUDFLARE_API_TOKEN** | 无原生 KV 时填写 | 加密变量 | 当前账号的 Workers KV Storage 编辑权限，不填写 Global API Key |
-| **KV_NAMESPACE_NAME** | 与 ID 二选一 | `forkedgetunnel-myproject-production-KV` | 固定且项目专用的名称，首次读取配置时自动创建或复用；预览使用另一名称 |
-| **KV_NAMESPACE_ID** | 与名称二选一 | 已有命名空间 ID | 保留原数据时填写；优先于名称，不自动替换失效 ID |
-| **EDT_PAGES_URL** | ❌ | `https://your-pages.example.com` | 可选的外部管理面板回退地址（不要包含 `/admin`）；合并后的 Pages 部署无需填写，只有在使用普通 Worker 或想切换到外部面板时才需要 |
-| **PROXYIP** | ❌ | `proxyip.cmliussss.net` | 全局自定义反代 IP，默认值 |
-| **URL** | ❌ | `https://your-public-site.example` | 公开回退页面；留空时普通访问和无效传输请求返回相同的普通 404。可填网页 URL、`nginx` 或 `1101`；无效传输只以 GET 获取外部首页，不转发请求凭据和正文 |
-| **GO2SOCKS5** | ❌ | `blog.cmliussss.com`,`*.ip111.cn`,`*google.com` | 强制走 SOCKS5 的名单 (`*` 为全局，域名用逗号分隔) |
-| **DEBUG** | ❌ | `1`或`true` | **开发者模式**，默认**关闭**调试日志功能（console.log），设置`1`或`true`则**开启**调试日志功能 |
-| **OFF_LOG** | ❌ | `1`或`true` | 默认**开启**KV日志记录功能，设置`1`或`true`则**关闭**日志记录功能 |
-| **BEST_SUB** | ❌ | `1`或`true` | 默认**关闭**作为**优选订阅生成器**的功能，设置`1`或`true`则**开启**该功能 |
-| **PRELOAD_RACE_DIAL** | ❌ | `1`或`true` | 默认**关闭**作为**预加载竞速拨号**的功能，设置`1`或`true`则**开启**该功能 |
-| **TCP_CONCURRENT_DIAL**   | ❌ | `2` | **TCP 并发拨号数**，默认值为`2`；设置后不再根据中国移动网络自动降为单路 |
-| **PROXY_CONCURRENT_DIAL** | ❌ | `1` | **反代并发拨号数**，默认值为`1`；数值越高连接速度越快，但 IP 切换也越频繁 |
+在独立的「🏠 免费家宽链式」模块开启并保存，顶部会显示单独的「Clash 家宽订阅」。将它作为配置文件或订阅配置导入 **mihomo / Clash Meta 1.19.25+**，在「🚀 节点选择」中选择「🏠 家宽自动」，也可进入「🏠 家宽节点」手动选择；不要将它作为普通 VLESS 节点链接导入。
 
----
+链路为客户端 → 当前 CF 节点 → VPN Gate 志愿者共享 OpenVPN 节点 → 目标站，使用 `dialer-proxy`，当前只生成 TCP 链路。它不保证出口是家庭宽带，也不保证稳定性；志愿者节点可能掉线、拥挤或观察经过的流量。默认关闭，不开启时不请求 VPN Gate 清单，普通订阅不受影响。
 
-## 🔧 高级实用技巧
-如需修改 **订阅地址里的TOKEN** 和 **用于节点验证的UUID** ，可通过修改变量
-1. 修改`ADMIN`或`KEY`变量的值，可以随机修改 **订阅地址里的TOKEN** 和 **用于节点验证的UUID**
-2. 设置`UUID`变量可以强制固定 **订阅地址里的TOKEN** 和 **用于节点验证的UUID**，注意必须是**UUIDv4**标准格式，否则会导致节点无法使用。
+<a id="environment-variables"></a>
 
-本工具支持通过 **PATH路径** 动态切换底层代理方案：
+## 环境变量
 
-- 指定 `PROXYIP` 案例
-   ```url
-   /proxyip=proxyip.cmliussss.net
-   /?proxyip=proxyip.cmliussss.net
-   ```
+首次部署优先按上面的四项变量表操作，其余通常可以留空。变量属于对应的生产或预览环境，修改后需要新部署生效。下表中的示例均为占位说明。
 
-- 指定 `SOCKS5` 案例
-   ```url
-   /socks5=user:password@127.0.0.1:1080
-   /?socks5=user:password@127.0.0.1:1080
-   /socks://dXNlcjpwYXNzd29yZA==@127.0.0.1:1080 (默认激活全局SOCKS5)
-   /socks5://user:password@127.0.0.1:1080 (默认激活全局SOCKS5)
-   ```
+| 变量名 | 用途与当前行为 |
+| --- | --- |
+| `ADMIN` | 后台登录密码，请自行设置长密码；建议以加密变量保存。只填此项不能提供持久化存储。 |
+| `CLOUDFLARE_ACCOUNT_ID` | 无原生 `KV` 绑定时使用的账号 ID，必须与 Token 授权账号一致。 |
+| `CLOUDFLARE_API_TOKEN` | 无原生绑定时使用的 Token 完整值，需 Workers KV Storage 编辑权限；必须加密保存。 |
+| `KV_NAMESPACE_NAME` | 新项目自定的固定、专用名称，如 `forkedgetunnel-myproject-production-KV`；自动创建或复用，预览环境使用另一名称。 |
+| `KV_NAMESPACE_ID` | 使用原数据时填写原命名空间 ID；优先于名称，不自动替换失效 ID。与名称二选一即可。 |
+| `KEY` | 可选的快速订阅路径密钥，也参与默认 UUID 派生；自定值可通过 `/<KEY的值>` 获取节点，应当作为凭据保管。 |
+| `UUID` | 可选的有效 UUIDv4，用来固定节点凭据；未填写或格式无效时按 `ADMIN` 与 `KEY` 派生。 |
+| `HOST` | 可选的节点主机名覆盖，首个主机参与订阅 Token 派生；一般留空使用访问域名，不要填写带路径的网页 URL。 |
+| `PROXYIP` | 可选的反代地址覆盖；面板新配置的初始值是 `proxyip.cmliussss.net`，不代表该公共服务始终可用。 |
+| `EDT_PAGES_URL` | 可选的外部面板根地址，不含 `/admin`。本教程的同仓库 Pages 部署应留空；指定外部面板可能缺少本 fork 的 UI 功能。 |
+| `URL` | 可选的公开回退页面 URL，也支持 `nginx`、`1101` 特殊值；留空时普通访问和无效传输请求返回普通 404。外部页面以 GET 获取，不转发请求凭据和正文。 |
+| `GO2SOCKS5` | 标准链式代理模式的目标域名匹配名单，逗号分隔，支持通配符，`*` 表示所有目标。需配合已配置的链式代理使用。 |
+| `DEBUG` | `1` 或 `true` 开启调试日志；默认关闭。 |
+| `OFF_LOG` | `1` 或 `true` 关闭本项目的 KV 请求日志，不代表关闭 Cloudflare 平台日志。 |
+| `PRELOAD_RACE_DIAL` | `1` 或 `true` 开启预加载竞速拨号；默认关闭，不保证一定加速。 |
+| `TCP_CONCURRENT_DIAL` | 默认 `2`；未显式设置时，中国移动网络会自动降为 `1`，显式设置后不自动降路数。 |
+| `PROXY_CONCURRENT_DIAL` | 反代并发拨号数，默认 `1`；增加并发会增加连接尝试，不保证更快。 |
 
-- 指定 `HTTP代理` 案例
-   ```url
-   /http=user:password@127.0.0.1:1080
-   /http://user:password@127.0.0.1:8080 (默认激活全局SOCKS5)
-   ```
+兼容变量 `BEST_SUB` 仅供特定上游优选生成器请求使用，还会检查请求参数及 User-Agent；普通订阅和本教程无需设置它。布尔开关按字符串 `1` / `true` 识别。
 
-- 指定 `Trojan fallback` 案例（由于使用场景为自建对接, 仅 Trojan 入站，fallback 服务需为同密码、非 WebSocket、非 TLS. 此时 UDP 透传给 fallback, 性能优秀, 功能完整）
-   ```url
-   /trojan=1.1.1.1:1234
-   ```
+### 修改密码、UUID 与订阅链接
 
----
+- 未固定有效 `UUID` 时，UUID 根据 `ADMIN` 与 `KEY` **确定性派生**；更改它们可能使现有节点凭据失效，并非每次随机生成。
+- 设置有效 `UUID` 后，修改 `ADMIN` / `KEY` 不再改变该 UUID。订阅 Token 还取决于主机名，即使 UUID 固定，访问域名或 `HOST` 改变也可能改变链接。
+- 修改后从面板重新复制链接并更新客户端；存储名称 / ID 应继续保持原值，不要通过换 KV 来轮换凭据。
 
-## 💻 客户端适配情况
+### 路径中的链式参数
 
-| 平台 | 推荐客户端 |
-| :--- | :--- |
-| **Windows** | [v2rayN](https://github.com/2dust/v2rayN/releases)、[Hiddify](https://github.com/hiddify/hiddify-app/releases)、[FlClash](https://github.com/chen08209/FlClash/releases)、[mihomo-party](https://github.com/mihomo-party-org/clash-party/releases)、[Clash Verge Rev](https://github.com/clash-verge-rev/clash-verge-rev/releases)、[Clashmi](https://github.com/KaringX/clashmi/releases)、[FlyClash](https://github.com/GtxFury/FlyClash/releases)、[Karing](https://github.com/KaringX/karing/releases)、[Bettbox](https://github.com/appshubcc/Bettbox/releases) |
-| **Android** | [v2rayNG](https://github.com/2dust/v2rayNG/releases)、[ClashMetaForAndroid](https://github.com/MetaCubeX/ClashMetaForAndroid/releases/)、[FlClash](https://github.com/chen08209/FlClash/releases)、[Clashmi](https://github.com/KaringX/clashmi/releases)、[Hiddify](https://github.com/hiddify/hiddify-app/releases)、[NekoBox](https://github.com/MatsuriDayo/NekoBoxForAndroid/releases)、[FlyClash](https://github.com/GtxFury/FlyClash/releases)、[Karing](https://github.com/KaringX/karing/releases)、[Bettbox](https://github.com/appshubcc/Bettbox/releases) |
-| **iOS** | Surge、Shadowrocket、Stash、[Hiddify](https://github.com/hiddify/hiddify-app/releases)、Loon、Egern、[Clashmi](https://clashmi.app/download)、[Karing](https://karing.app/)、Quantumult X |
-| **macOS** | [FlClash](https://github.com/chen08209/FlClash/releases)、[mihomo-party](https://github.com/mihomo-party-org/clash-party/releases)、[Clash Verge Rev](https://github.com/clash-verge-rev/clash-verge-rev/releases)、Surge、[Clashmi](https://clashmi.app/download)、[Karing](https://karing.app/)、[FlyClash](https://github.com/GtxFury/FlyClash/releases) |
-| **鸿蒙** | [ClashBox](https://github.com/xiaobaigroup/ClashBox/releases) |
----
+通常直接在面板中设置反代并生成链接即可。手动配置时，当前解析器也支持以下路径形式（地址和凭据需替换为自己的）：
 
-## ⭐ 项目热度
+```text
+/proxyip=proxy.example.net:443
+/?proxyip=proxy.example.net:443
+/socks5=user:password@proxy.example.net:1080
+/socks5://user:password@proxy.example.net:1080
+/http=user:password@proxy.example.net:8080
+/http://user:password@proxy.example.net:8080
+```
 
-![GitHub stars](https://img.shields.io/github/stars/Chengeeker/forkedgetunnel?style=flat-square)
+`socks5=` / `http=` 使用标准模式，`socks5://` / `http://` 使用对应协议的全局模式。这里的代理由 Cloudflare 运行环境连接，填 `127.0.0.1` 不会连接到你的 Windows 电脑；本机 CFData 和 Clash 控制接口则是浏览器访问本机的独立功能。
 
----
+<a id="maintenance"></a>
 
-## 🙏 特别鸣谢
-### 💖 赞助支持 - 提供云服务器维持[订阅转换服务](https://sub.cmliussss.net/)
-- [Yuusei Network](https://yuusei.io/)
-- [VMRack](https://www.vmrack.net?ref_code=5Zk7eNhbgL7)
+## 升级与排错
 
-### 🛠 开源代码引用
-- [zizifn/edgetunnel](https://github.com/zizifn/edgetunnel)
-- [3Kmfi6HP/EDtunnel](https://github.com/6Kmfi6HP/EDtunnel)
-- [SHIJS1999/cloudflare-worker-vless-ip](https://github.com/SHIJS1999/cloudflare-worker-vless-ip)
-- [Stanley-baby](https://github.com/Stanley-baby)
-- [ACL4SSR](https://github.com/ACL4SSR/ACL4SSR/tree/master/Clash/config)
-- [股神](https://t.me/CF_NAT/38889)
-- [Workers/Pages Metrics](https://t.me/zhetengsha/3382)
-- [白嫖哥](https://t.me/bestcfipas)
-- [Mingyu](https://github.com/ymyuuu/workers-vless)
-- [ToiCF/CF-Workers-HTTPS](https://github.com/ToiCF/CF-Workers-HTTPS)
-- [ToiCF/CF-Workers-TURN](https://github.com/ToiCF/CF-Workers-TURN)
-- [ToiCF/CF-Workers-SoftEther](https://github.com/ToiCF/CF-Workers-SoftEther)
-- [eooce](https://github.com/eooce/Cloudflare-proxy)
-- [Sukka](https://ip.skk.moe/)
-- [zhangtaile](https://github.com/cmliu/edgetunnel/pull/999)
-- [1345695](https://github.com/1345695/edcloudwasm)
-- [ToiCF/GrainTCP](https://github.com/ToiCF/GrainTCP)
-- [xream](https://github.com/cmliu/edgetunnel/pull/1359)
+Pages 关联的是你自己的 GitHub 仓库和生产分支。更新代码后，检查 Pages 新部署是否成功，再刷新管理页面；客户端仍需更新订阅。持续使用同一 KV 名称 / ID，不要删除旧命名空间。不要直接用上游 `_worker.js` 或面板覆盖本 fork：那会丢失本版本修改；同步上游时需要审查冲突及功能差异。
 
----
+| 现象 | 检查方法 |
+| --- | --- |
+| 首页 404 | 未设置 `URL` 时属于预期行为，后台入口是 `/admin`。 |
+| “尚未配置持久化存储” | 按 [已有项目补救步骤](#existing-pages-recovery) 检查四项变量、生产/预览环境及新部署；普通文本变量 `KV` 不是原生绑定。 |
+| 存储请求失败或 503 | 查看具体错误，核对 Token 权限、账号及有效期；失败不能当作已保存，不要删除原 KV。 |
+| 优选库可见，但在线初筛失败 | 库不依赖线路检测；在线检测依赖第三方服务。可重试或使用本地方式，保留实际错误，不代表本机必然无网络。 |
+| 已导入优选，但订阅没变 | 确认使用自定义订阅模式并保存，再在客户端更新订阅。 |
+| 本地优选点击无反应 | 确认已在 Windows 安装启动包并允许浏览器唤起；按 [启动器说明](./local-cfdata/README.md) 排查端口及启动日志。 |
+| 在线有速度，客户端连接超时 | 在线测试没有验证本项目的 TLS/ECH、WS、UUID 或代理出口；用客户端日志或本地 Clash 实测定位失败阶段。 |
+| Cloudflare Error 1101 | 查看该次请求的运行异常及日志。上游同名更新已纳入，但不能仅凭版本标题认定全部 1101 已解决，详见 [开发记录](./DEVELOPMENT.md)。 |
 
-## 📄 许可证与修改说明
+反馈问题时提供版本/提交、部署环境、操作步骤、错误文字、HTTP 状态码和变量**名称**即可；请遮盖密码、Token、Cookie、节点凭据及完整订阅链接。
 
-本仓库的 Worker 和网页是上游 `edgetunnel` 项目的修改版，继续使用 GNU GPL-2.0，完整文本见 [LICENSE](./LICENSE)。独立本机程序 `local-cfdata` 使用 [GPL-3.0-or-later](./local-cfdata/LICENSE)，通过独立进程和浏览器链接接入，来源与对应源码见该目录说明。第三方组件、数据和外部服务仍以其各自的许可证或服务条款为准。
+## 来源、许可证与开发记录
 
----
+- Worker 与网页基于上游 `edgetunnel`，继续使用 [GNU GPL-2.0](./LICENSE)。本 fork 修改记录见 [DEVELOPMENT.md](./DEVELOPMENT.md)；[CHANGELOG](./CHANGELOG) 保留上游记录，不是完整的 fork 更新日志。
+- 独立 Windows 启动器 `local-cfdata` 使用 [GPL-3.0-or-later](./local-cfdata/LICENSE)，CFData-WEB 来源、对应源码与构建见 [组件说明](./local-cfdata/README.md)。
+- 上游历史引用及本 fork 的组件来源见 [ACKNOWLEDGEMENTS.md](./ACKNOWLEDGEMENTS.md)。第三方组件、数据和外部服务遵循各自许可证或条款。
 
-## ⚠️ 免责声明与使用提示
-
-1. 作者建议将本项目用于**教育、科学研究及个人安全测试**；这是一项风险提示，不构成对 GPL-2.0 所授予权利的额外限制。
-2. 使用者在下载或使用本项目代码时，必须严格遵守所在地区的法律法规。
-3. 上游作者 **cmliu** 对任何滥用本项目代码导致的行为或后果均不承担任何责任。
-4. 本项目不对因使用代码引起的任何直接或间接损害负责。
-5. 建议在测试完成后及时删除不再需要的相关部署，以减少安全风险；这只是安全建议，不构成许可证条件。
-
----
-
-**如果您觉得项目对您有帮助，请给一个 Star 🌟，这是对我最大的鼓励！**
+使用者应遵守适用法律及平台服务条款。软件按许可证提供，不承诺网络可用率、隐私或代理不可识别性。
