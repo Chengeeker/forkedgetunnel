@@ -2,8 +2,8 @@
 forkedgetunnel is a modified fork of the upstream edgetunnel project.
 Upstream source: https://github.com/cmliu/edgetunnel
 Fork modifications and additions by Chengeeker, 2026-09-30.
-The project's own source and fork modifications are distributed under the
-GNU General Public License, version 2. See LICENSE for the complete text.
+The Worker and web source use GNU GPL version 2; see LICENSE.
+The independent local-cfdata launcher uses GPL-3.0-or-later; see its LICENSE.
 -->
 
 # 🚀 forkedgetunnel 2.1
@@ -161,6 +161,16 @@ IP 库独立于线路检测显示。**CF 官方网段 v4/v6（内置）**可直�
 
 ---
 
+## 💻 Windows 本地优选（CFData-WEB）
+
+“本地优选IP”现在会唤起 Windows 本机的 CFData-WEB，并在浏览器打开 `http://127.0.0.1:13336`。
+
+首次使用请[下载 Windows 启动包](https://github.com/Chengeeker/forkedgetunnel/releases/download/local-cfdata-v1.0.0/CFData-Local-Windows-1.0.0.zip)，解压后双击 `install.cmd`。安装完成会自动打开本地页面；以后直接点管理面板的“本地优选IP”即可。浏览器首次询问是否打开本机程序时，需要确认；网页不能代替用户完成首次安装。
+
+支持 Windows x64 / ARM64，只监听本机，不设置开机自启。重复点击会复用已有服务；使用结束可运行启动包中的 `stop.cmd`。选出的结果可复制回管理面板的自定义优选地址，保存配置后安卓导入订阅链接即可。详细信息见 [本地启动器说明](./local-cfdata/README.md)。
+
+---
+
 ## 🏠 可选免费家宽链式
 
 部署完成并登录管理面板后，打开单独的「🏠 免费家宽链式」设置模块，勾选「开启免费家宽链式」并保存，顶部的订阅链接区域会显示单独的「Clash 家宽订阅」。复制这条链接，在 mihomo / Clash Meta 1.19.25+ 中作为配置文件或订阅配置导入；不要把它当作普通 VLESS 节点链接使用。导入后，在「🚀 节点选择」中选择「🏠 家宽自动」即可开始使用，需要手动挑选时再进入「🏠 家宽节点」。这个订阅使用当前 CF 节点作为前置，通过 mihomo 的 `dialer-proxy` 将 TCP OpenVPN 连接转发到 VPN Gate 的公开志愿者节点。
@@ -273,7 +283,7 @@ IP 库独立于线路检测显示。**CF 官方网段 v4/v6（内置）**可直�
 
 ## 📄 许可证与修改说明
 
-本仓库是上游 `edgetunnel` 项目的修改版，保留并继续使用 GNU GPL-2.0。当前 fork 的新增和修改内容也按 GPL-2.0 发布；第三方组件、数据和外部服务仍以其各自的许可证或服务条款为准。完整许可证文本见仓库中的 [LICENSE](./LICENSE) 文件。
+本仓库的 Worker 和网页是上游 `edgetunnel` 项目的修改版，继续使用 GNU GPL-2.0，完整文本见 [LICENSE](./LICENSE)。独立本机程序 `local-cfdata` 使用 [GPL-3.0-or-later](./local-cfdata/LICENSE)，通过独立进程和浏览器链接接入，来源与对应源码见该目录说明。第三方组件、数据和外部服务仍以其各自的许可证或服务条款为准。
 
 ---
 

@@ -1,0 +1,26 @@
+name: Windows CFData launcher release
+on:
+  push:
+    tags:
+      - 'local-cfdata-v*'
+permissions:
+  contents: write
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build verified Windows package
+        shell: pwsh
+        run: ./local-cfdata/build.ps1
+      - uses: softprops/action-gh-release@v2
+        with:
+          name: CFData Windows 本地启动器 1.0.0
+          body: |
+            首次使用下载 Windows ZIP，解压并运行 install.cmd。以后点击管理面板的“本地优选IP”，即可启动本机 CFData-WEB 并打开浏览器。
+
+            后端为未修改的 PoemMisty/CFData-WEB v1.8.5，构建时验证官方 SHA-256。仅监听 127.0.0.1:13336，无需管理员权限，无开机自启。结束后可运行 stop.cmd。
+
+            本机组件采用 GPL-3.0-or-later。启动器对应源码见此版本 local-cfdata 目录，上游对应源码 ZIP 和许可证同时提供。
+          files: build/local-cfdata/release/*
+          fail_on_unmatched_files: true

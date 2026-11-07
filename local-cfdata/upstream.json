@@ -1,0 +1,8 @@
+{
+  "version": "v1.8.5",
+  "source": "https://github.com/PoemMisty/CFData-WEB/archive/refs/tags/v1.8.5.zip",
+  "assets": {
+    "cfdata-windows-amd64.exe": "d28b870f6a25946333d11bfd58cba3143a06c1f8954f0a995aba1fcb31c9de27",
+    "cfdata-windows-arm64.exe": "d4d93ce8d504440a27d622d87cd337e77a04b3655c192559757f77408503773d"
+  }
+}

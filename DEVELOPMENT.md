@@ -7,6 +7,16 @@ GNU General Public License, version 2.
 
 # 开发记录
 
+## Windows 本地 CFData-WEB 启动接入（2026-11-07）
+
+- 用户要求点击“本地优选IP”直接启动 CFData-WEB 并打开浏览器，随后明确取消 Android 本机启动，只在 Windows 配置，Android 导入订阅。已撤回未提交的 Android 组件，不构建或发布 APK。此前在线优选故障修复、域名解析测速及导入已单独推送为 `edd2081`。
+- 上游为 `PoemMisty/CFData-WEB`，使用未修改的正式版 `v1.8.5`。默认 `-host` 留空会监听全部地址，因此启动器固定传入 `-host 127.0.0.1 -port 13336`。网页不能直接启动未安装的程序；首次安装组件和浏览器首次唤起确认仍需用户完成，不能宣传零安装。
+- 旧本地工具目录替换为 CFData 专用入口及安装指引，删除相应目录拉取、排序和筛选 JS。Windows 选择按钮直接发起固定 `forkedgetunnel-cfdata://open`，已有在线警告中的本地入口复用同一流程；非 Windows 只展示订阅使用说明，不尝试本机唤起。启动请求不代表启动成功，页面不伪造服务就绪状态，也不主动跨域访问本机管理接口。
+- 用户级 Windows 启动器安装到 `%LOCALAPPDATA%\forkedgetunnel\CFData`，注册独占名称的 HKCU 协议，URI 内容不传给 PowerShell 或后端。每次运行校验后端 SHA-256；互斥锁阻止重复启动，已有同路径进程复用，端口冲突不杀其他程序；启动就绪最多等待约 90 秒，再打开固定本机地址。停止只匹配自身安装路径。重复安装同版本不覆盖正在运行的 EXE，卸载关联保留结果文件，不设置开机自启。
+- 官方 Windows AMD64 和 ARM64 的固定 SHA-256 保存在 `local-cfdata/upstream.json`，打包和启动均校验；源码分支只提交脚本、清单和许可证。ZIP 附带两种架构原始程序、UTF-8 BOM 的脚本（兼容 Windows PowerShell 5.1）及说明；发布附带对应上游源码 ZIP、许可证和 SHA256SUMS。原生组件独立采用 GPL-3.0-or-later，根 README 明确此例外；Worker/网页继续 GPL-2.0，未混入上游 GPL-3.0 程序源码。
+- `tests/cfdata-launcher.test.cjs` 检查 Windows 唤起、Android 引导、弹窗生命周期、固定端点与 URI 隔离；原在线检测、域名输入、非 CN 警告、本地 Clash 和专用监听测试继续通过，内联脚本编译及 Pages functions build 成功。源码按当前 Windows 包独立发布；`local-cfdata-v*` 标签触发 Windows Actions 构建和 GitHub Release，下载入口指向固定 1.0.0 版本。
+- Windows 实机完成安装、冷启动、重复启动与同版本重复安装复用进程、停止后重启；核对实际进程参数为固定回环地址及端口，直接 TCP 和 HTTP 成功。Chrome 真实页面显示 v1.8.5 且“已连接服务器”，核对截图位于忽略的 `build/local-cfdata/browser-check.png`。测试后本机服务已重新启动，未进行大规模扫描或修改用户 CFData 配置。浏览器的首次外部应用确认不自动绕过；网页按钮请求由回归验证，不将程序单独启动验收混称为所有浏览器唤起策略都已验收。
+
 ## 在线优选失效恢复及域名输入（2026-11-07）
 
 - 用户反馈双栈均显示“不具备优选条件 / 线路不可用”，同时 IP 库消失。根因在于 `resolveBestHost` 直接信任 localStorage 中的旧域名，不验证或切换；`updateLibraryOptions` 又以线路检测结果过滤静态 IP 库，`updateActionAvailability` 禁用初筛按钮，导致外部服务失败后页面没有重试入口。复查既有“非 CN 仅警告”修复，没有恢复地区硬限制。
