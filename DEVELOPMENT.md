@@ -7,6 +7,38 @@ GNU General Public License, version 2.
 
 # 开发记录
 
+## 固定凭据与下行合包 CPU 开销优化（2026-11-09）
+
+- 用户在上一轮排查后明确要求优化并重新推送 GitHub。本轮基线为 main 的 0a123fd8ae0706c3a10596d87532a30346eceedd，工作区仅已有上一轮诊断文档修改，已一并保留；原 Worker 与诊断文档保存到 build/rollback/20261109-cpu/。修改范围只有 _worker.js、tests/worker-cpu.test.cjs 和本开发记录；不改面板、部署脚本、配置、原 KV、公开响应、套餐或博客效果。本项目没有 APK 构建目标。
+- 请求入口以前即使有合法显式 UUID，也先做两次 MD5；仅 ADMIN/KEY 派生身份时，每次请求都重复计算同一结果。现在合法 UUID 直接沿用，否则只缓存一份固定派生输入及已完成的身份结果，输入变化即重新计算，失败不覆盖已有结果，不缓存进行中的 Promise、请求对象、UA 会话摘要、KV 配置或多用户列表。派生算法、默认密钥、UUID 格式、密码别名优先级和鉴权结果不变；并发请求使用各自局部结果，不从可能已被另一个请求更新的缓存读取返回值。
+- WebSocket 下行的共享 Grain 合包器原先先复制到一个容量大小的可复用缓冲，再 slice 整份结果交给异步发送。现在独立结果分支直接按真实合包长度分配最终缓冲并只写一次，取消第二次整包复制以及每连接保留的中间合包缓冲；上行的复用缓冲分支、单块直发、队列条目与完成回调保持原语义。BYOB 小块进入延迟合包前的 slice 仍保留，不能为省复制删掉这个所有权保护；也保留异步发送等待、关闭前排空、背压、认证和拨号行为，没有调整合包等待时间来换取基准成绩。
+- 新增 worker-cpu.test.cjs：先在原代码复现暖请求重复两次摘要的失败，再验证缓存复用、显式/无效 UUID、密码/密钥变化、摘要失败后重试、已有缓存不被失败覆盖、两组同时未命中的并发身份隔离；合包计数断言每 16 字节结果只 set 16 字节且不再 slice，验证后续合包不覆盖前一份、不同块长顺序/边界和两种所有权模式，以及异步发送、一次性响应头和 BYOB 缓冲复用的内容完整性。测试凭据都是显式测试值，不使用用户账号数据。
+- 本机 V8 VM 微基准由 build/cpu-20261109/cpu-bench.cjs 保留，Node v26.12.1，每个场景预热后重复 5 轮、每轮 10,000 次，取当前进程 user+system CPU 时间中位数。8×4KiB 合成 32KiB：187ms→110ms，约下降 41%；2×16KiB：141ms→109ms，约下降 23%；暖凭据入口（含模拟响应）：282ms→156ms，约下降 45%。这是当前主机的微基准和机制验证，存在系统计时粒度及运行波动，不能换算成 Cloudflare 生产 CPU、全协议吞吐提升或超限错误降幅。未修改的 32KiB 直发路径不计入优化收益。
+- 必要检查通过：新 CPU 回归、原 worker-compatibility 离线协议/登录/探测/加密检查、pages-kv 的 7 项回归；源码及两份构建产物的 node --check、git diff --check。Wrangler 4.128.0 的 Worker deploy --dry-run 与 Pages Advanced Mode 构建均成功，产物位于 build/cpu-20261109/worker/ 与 pages/，Worker 上传估算 475.68KiB、gzip 88.50KiB。UTF-8 BOM 与供面板读取的 Version 保持原样，Version 仍代表已合入的上游版本，不冒充新的上游修复。
+- 用已安装 Wrangler 的 Miniflare/workerd 检查源码和最终 Pages 包：合法/无效 gRPC、XHTTP、普通 WS 子协议、early-data 和 SS 升级握手通过；去掉显式 UUID 后，独立计算旧派生身份，多次实际请求仍通过。另用本机 127.0.0.1 TCP 服务经真实 workerd 转发到 WebSocket，核对 300,000 字节连续内容和首包响应头，源码与 Pages 产物均一致，无外部 fetch。SS 这里只验证升级握手，未冒称完整加密下载验收。临时运行脚本位于忽略的 tmp/check-worker-cpu-runtime.cjs 与 tmp/check-worker-cpu-bundle.cjs。
+- 测试夹具曾在去掉 UUID 后遗漏 KV，导致公开请求进入无存储提示页并被外网禁止规则拦截；补上临时原生 KV 后重跑通过，这是夹具问题，未据此修改生产回退逻辑。首次编辑时发现源码原有 BOM，已恢复，避免夹带无关文件格式变化。后续回归不得为通过测试放开公网出口或把无存储页面当作 CPU 故障。
+- 推送目标为远端 forkedgetunnel 对应的 Chengeeker/forkedgetunnel:main；origin 仍指向另一个仓库，不能混用。推送前 fetch 确认 main 未分叉，保留旧生产部署和 0a123fd 作为源码回退。GitHub 关联的 Pages 会按原配置自动构建；部署状态需核对具体提交，不能把源码推送成功当作线上更新完成，更不能把打包和本机测试当作 CPU 超限已消除。
+- 仍需线上观察：实际代理出口、真实客户端的持续下载/流式会话、相近使用强度下的 CPU 超限率及平台内部错误率。本次只减少已测得的重复计算与合包复制，不能突破免费套餐 CPU 限制，也不承诺修复 internalError；内部错误沿用下面诊断章节的独立处理边界。不删除旧部署、不清空 KV、不升级付费套餐。
+
+## Cloudflare CPU 告警与代理链路排查（2026-11-08）
+- 更新/优化可行性复核（2026-11-09）：用户追问能否通过更新和优化项目解决。经 GitHub API 核对，上游 cmliu/edgetunnel 的 main 最新仍为 a8ab11125ece9bc27983f609a6359be81b21050c（2026-10-08）；本地 merge-base --is-ancestor 确认当前 fork 已包含它，不能声称存在尚未同步的主线 CPU 修复。当前代码已有 XHTTP 下行 pipeTo/IdentityTransformStream、上行合包、WS 下行合包及 BYOB；BYOB 小块 slice 保证读取缓冲复用时发送数据仍有效，未经所有权测试不得为减复制直接删掉。每次入口仍会派生固定凭据摘要，WS 分块/调度/并发拨号也是可进一步测量的方向，但本轮没有性能剖析或失败请求级证据，不能把静态候选当作已证实热点。
+- 可行性边界：针对确认的热点减少计算、复制及调度有机会降低 CPU 超限；免费套餐的执行预算仍然存在，不能承诺任何流量下零超限。平台 internalError 与代码异常/CPU 超限必须分开验收，不承诺更新项目能消除平台内部失败。先取得失败请求的传输类型、CPU 和完整链路证据，再做最小修改；离线兼容检查与打包通过不能代替线上相近使用强度下的错误率对照。本次复核仅补充诊断，不改运行代码、配置或部署。
+
+- 用户收到 2026-11-08 22:07（北京时间）的账户级邮件：过去 24 小时至少 1,000 次免费套餐 CPU 超限，并反馈多个项目变慢。已通过本人当前登录的 Cloudflare 控制台读取生产指标、KV 用量和短时实时日志；不记录账号 ID、邮件地址、令牌、密码、UUID 或完整订阅。KV 命名空间只有两个不代表只有两个计算项目，实际列表为六个 Pages 项目、两个 Workers 服务。
+- 为避免滚动窗口变化误判，以发信时间为截止回看 2026-11-07 22:07 至 2026-11-08 22:07（GMT+8）：forkedgetunnel 成功 5,546、执行错误 6,532，其中 CPU 超限 1,362、内部错误 5,170，脚本异常/内存超限/客户端断开分类均为 0；共 12,078 次执行，错误约 54.1%。1,362 次足以达到邮件所述门槛，但邮件未提供精确聚合截止时刻，不能把发信时间当作其内部作业的已证实截止时间。早先滚动过去 24 小时读到 CPU 738 次，随查询时间推移降至 723/721 次，是旧高峰移出窗口，不是清空额度或已修复。
+- 约 23:49 查询过去 1 小时：成功 67、错误 38，错误全部归为内部，CPU/内存超限与脚本异常均为 0，执行错误率约 36.2%。CPU 高峰主要在 11 月 7 日深夜和 11 月 8 日凌晨，11 月 8 日 00:00 小时桶为 702 次；不能仅凭旧告警断言此刻仍在 CPU 超限，也不能把所有内部错误加到 CPU 超限计数。
+- 其他动态项目按各自查询当时的过去 24 小时读取：cloudflare-imgbed 成功 170、执行错误 0；nodewarden 调用 413、执行错误与 CPU 超限 0；hinge-relay 调用 22、执行错误 0。三个时间窗口与上述固定发信回看窗口略有不同，不能作为严格同窗口全账户对账，但未见这些项目出现同类运行故障。未逐个验证所有静态 Pages 项目或登录后的业务接口。
+- KV 控制台显示周期 November 5–December 5 的全账户约 1.63k 读取、48 写入、24 删除、4 列出，当前存储 749 kB；未见容量或日总操作数耗尽的证据。最初账户计算用量为当日 UTC 2,774/100,000 次请求，远未达到日请求总额；与按北京时间选取的滚动/固定 24 小时指标不是相同口径。
+- 用户确认访问其他项目时也在使用 forkedgetunnel 节点，因此该代理链路异常可以同时拖慢多个访问目标，这是请求延迟优先验证的共同依赖。用户随后关闭代理，反馈博客滚动仍卡；这是渲染流畅度测试，不能当作图床/密码库请求延迟已经完成独立节点对照。必要低频 HTTP 检查：图床自定义域与 pages.dev、游戏站、密码库首页均返回 200，隧道公开根路径返回预期 404；这些请求仍可能经过现有代理/TUN，不能冒称直连或独立网络测试，也不代表代理拨号、上传、密码库登录等功能验收。
+- Pages 实时日志连接成功，观察到公开根路径 GET 为 Ok，以及一条 WebSocket 形态路径 /proxyip=proxyip.cmliussss.net 的 GET 为 Canceled；未采集到带异常栈的 CPU 超限事件，Cancelled 不能擅自归为 CPU 超限或平台内部错误。采样结束已暂停；未开启持久日志、调试变量或新增采样代码。公开备用出口仅是观察到的配置线索，未验证其实际参与比例、速度或可用性。
+- 官方定义：免费套餐 HTTP 执行 CPU 预算为 10 ms，网络/KV 等待不计入 CPU；超过 CPU 预算与耗尽全账户日请求数是两回事。内部错误 internalError 表示 Workers 运行平台内部失败，官方明确区别于脚本问题和资源限额。查询时官方状态 API 的 Workers、Pages、Workers KV 显示 operational，但这不能排除个别请求或机房异常。不能承诺升级付费套餐会解决内部错误，也不能凭名称把已知上游 1101 版本提交当作修复，继续遵循前面的 1101 差异核对记录。
+- 本地工作区最初干净，HEAD 为 0a123fd8ae0706c3a10596d87532a30346eceedd；线上生产部署为 cb9667de14d0c8b0d36414a87728c014c45fed59，两者 _worker.js 无差异。本轮只记录诊断，不修改运行代码、KV 内容、线上配置、部署或付费套餐，无 APK 目标。不用无依据的缓存/协议重写掩盖平台内部错误。后续先用不经该 Pages 项目的独立节点访问同一目标作对照；持续内部错误应按时间窗、部署和可取得的请求 Ray ID 向平台定位；CPU 优化需要再采集真实失败请求和性能剖析，确认热点后做最小兼容修复。
+- 一手依据：[Workers 限制](https://developers.cloudflare.com/workers/platform/limits/)、[调用状态及内部错误定义](https://developers.cloudflare.com/workers/observability/metrics-and-analytics/#invocation-statuses)、[KV 限制](https://developers.cloudflare.com/kv/platform/limits/)、[平台状态 API](https://www.cloudflarestatus.com/api/v2/summary.json)。本地/线上统计只证明各自时间窗口内的观察，不是修复或恢复成功的证明。
+
+- 后续区分滚动卡顿（跨至 2026-11-09 凌晨）：用户关闭代理后反馈自己的博客滑动依然卡。读取实际博客 DOM 和公开源码，桌面根元素为 glass-full/lg-full；10 个文章卡片和 7 个侧栏卡片使用 blur(34px) saturate(1.65)，导航 blur(35px)，body 固定多层渐变背景及 ::before 的 blur(52px)。这些前端效果由访问端浏览器处理；不能把页面已加载后的滚动掉帧归为 Worker CPU 预算或 KV 额度问题。
+- 在新建的临时博客标签页用现有 ButterflyGlass.setMode 做 full/fallback/full 对照，只改变当前标签页运行状态，未写入存储、源码或部署。早期标签页未前置时 requestAnimationFrame 被后台节流，样本无效并已排除；Profiler 域不可用、Tracing 未返回有效数据，不伪造性能剖析结论。前置标签页后每轮约 1.5 秒，使用 PageUp/PageDown 滚动并采集 rAF 间隔：full 向上两轮 P95 均为 72.3ms，fallback 向下为 41.0ms；补齐方向对照后 full 向下 P95 为 133.3ms、fallback 向上为 44.4ms。完整模式的间隔中位数为 33.3/35.8/61.2ms，fallback 两轮为 22.3/22.2ms。支持当前设备/页面的玻璃效果是明显渲染负担，但短时自动化采样不是标准刷新率、长期跑分或逐帧 GPU 分析；未逐项隔离全屏背景、卡片、导航及浏览器扩展的贡献。
+- 对照结束通过 finally 恢复 setMode('auto')，读回为 full 且卡片仍为原来的 blur(34px)，未留下显示模式更改；临时诊断标签页不保留。博客效果应在博客自身工程优化，不能为了滚动流畅度修改隧道协议、增加 KV、升级 Workers 套餐或重建 Pages。网络请求异常与前端掉帧可同时存在，当前两组证据分别记录；本轮仍仅诊断，不发布任何修复。源码依据：[玻璃卡片](https://github.com/Chengeeker/Chengeeker.github.io/blob/main/butterfly-glass/css/glass-core.css)、[全屏环境层](https://github.com/Chengeeker/Chengeeker.github.io/blob/main/butterfly-glass/css/glass-environment.css)、[模式运行时](https://github.com/Chengeeker/Chengeeker.github.io/blob/main/butterfly-glass/js/glass-runtime.js)。
+
 ## Windows 部署包加入 GitHub 发行版（2026-11-07）
 
 - 用户指出发行版只有 CFData 本地优选包，普通用户找不到部署 CMD。新增独立 Pages-Deploy-Windows.zip：根目录提供 redeploy-pages.cmd、refresh-pages-token.cmd、使用说明.txt、LICENSE，scripts/redeploy-pages.ps1 保持原相对路径。CMD 依赖脚本，不能只上传一个无法独立运行的入口；不引入在线下载执行器或修改部署逻辑。

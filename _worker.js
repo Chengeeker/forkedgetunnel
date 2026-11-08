@@ -12,6 +12,7 @@
 let 运行配置, 中转域名白名单缓存 = null, 调试日志打印 = false;
 let 中转域名白名单 = ['*tapecontent.net', '*cloudatacdn.com', '*loadshare.org', '*cdn-centaurus.com', 'scholar.google.com'];
 let 免费家宽节点缓存 = null, 免费家宽节点缓存到期时间 = 0;
+let 用户标识派生缓存 = null;
 const 管理静态页面地址 = 'https://edt-pages.github.io', 数字版本号 = Number(String(Version).replace(/\D+/g, ''));
 
 // Cloudflare Pages Advanced mode 会自动提供 ASSETS 绑定。合并部署时优先从
@@ -146,10 +147,20 @@ async function 处理入口请求(传入请求, 环境绑定, 执行上下文) {
 		const 连接升级头 = (传入请求.headers.get('Upgrade') || '').toLowerCase(), 内容类型值 = (传入请求.headers.get('content-type') || '').toLowerCase();
 		const 管理员密码 = 环境绑定.ADMIN || 环境绑定.admin || 环境绑定.PASSWORD || 环境绑定.password || 环境绑定.pswd || 环境绑定.TOKEN || 环境绑定.KEY || 环境绑定.UUID || 环境绑定.uuid;
 		const 加密秘钥 = 环境绑定.KEY || '勿动此默认密钥，有需求请自行通过添加变量KEY进行修改';
-		const 用户标识派生摘要 = await 计算双重摘要(管理员密码 + 加密秘钥);
 		const 用户标识格式正则 = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$/;
 		const 环境用户标识 = 环境绑定.UUID || 环境绑定.uuid;
-		const 用户凭据标识 = (环境用户标识 && 用户标识格式正则.test(环境用户标识)) ? 环境用户标识.toLowerCase() : [用户标识派生摘要.slice(0, 8), 用户标识派生摘要.slice(8, 12), '4' + 用户标识派生摘要.slice(13, 16), '8' + 用户标识派生摘要.slice(17, 20), 用户标识派生摘要.slice(20)].join('-');
+		let 用户凭据标识;
+		if (环境用户标识 && 用户标识格式正则.test(环境用户标识)) 用户凭据标识 = 环境用户标识.toLowerCase();
+		else {
+			const 派生输入 = 管理员密码 + 加密秘钥;
+			if (用户标识派生缓存?.输入 === 派生输入) 用户凭据标识 = 用户标识派生缓存.标识;
+			else {
+				const 用户标识派生摘要 = await 计算双重摘要(派生输入);
+				用户凭据标识 = [用户标识派生摘要.slice(0, 8), 用户标识派生摘要.slice(8, 12), '4' + 用户标识派生摘要.slice(13, 16), '8' + 用户标识派生摘要.slice(17, 20), 用户标识派生摘要.slice(20)].join('-');
+				// 仅保留一份已完成的固定凭据结果，变量变化即重新派生，不跨请求复用异步任务。
+				用户标识派生缓存 = { 输入: 派生输入, 标识: 用户凭据标识 };
+			}
+		}
 		const 主机候选集合 = 环境绑定.HOST ? (await 整理成数组(环境绑定.HOST)).map(h => h.toLowerCase().replace(/^https?:\/\//, '').split('/')[0].split(':')[0]) : [请求地址对象.hostname];
 		const 首选主机 = 主机候选集合[0];
 		const 访问路径 = 请求地址对象.pathname.slice(1).toLowerCase();
@@ -2751,7 +2762,7 @@ function 创建Grain收纳器(容量, 复制合包结果 = false) {
 			}
 			if (end === 头) return { chunk: first.chunk, items };
 
-			const output = (合包缓冲 ||= new Uint8Array(容量));
+			const output = 复制合包结果 ? new Uint8Array(totalBytes) : (合包缓冲 ||= new Uint8Array(容量));
 			output.set(first.chunk, 0);
 			let offset = first.chunk.byteLength;
 			while (头 < end) {
@@ -2763,8 +2774,8 @@ function 创建Grain收纳器(容量, 复制合包结果 = false) {
 				offset += next.chunk.byteLength;
 			}
 			压缩();
-			const bundled = output.subarray(0, totalBytes);
-			return { chunk: 复制合包结果 ? bundled.slice() : bundled, items };
+			const bundled = 复制合包结果 ? output : output.subarray(0, totalBytes);
+			return { chunk: bundled, items };
 		}
 	};
 }
