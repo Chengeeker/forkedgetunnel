@@ -7,6 +7,25 @@ GNU General Public License, version 2.
 
 # 开发记录
 
+## WebSocket 下行 CPU 排查与本地优化（2026-11-12）
+
+- Pages API 复核生产仍为 `d43a208`，已包含固定凭据和下行合包优化。以北京时间 11-11 11:00 至 12:00（Pages 指标 180 次资源超限的峰值小时）查询同账号自定义域名的边缘 HTTP 统计。该小时可见 1,395 次请求全部为 HTTP/1.1 GET 的 WebSocket 101 握手，路径都携带显式 `proxyip` 参数形式。按 UTC 11-11 全日自定义域名返回 12,535 次 101，另外只有 97 次其他响应，其中 2 次 POST 均为 403。边缘数据与 Pages 执行结果来自不同数据集，无法按请求关联，也不覆盖 `pages.dev`；101 只证明成功握手，无法确定后续哪条连接超限、具体载荷协议、上下行阶段或是否真的使用备用出口。查询字符串维度不可用，仅保留聚合分类，未保存原始路径、域名、查询参数、客户端信息或认证内容。
+- 已尝试生产 Pages 的短时 `wrangler pages deployment tail`，JSON 模式 85 秒未收到请求级事件；Pretty 模式确认连通，42 秒内也没有事件，单次根路径探针未收到 HTTP 响应。Cloudflare Pages 实时日志不存储。历史聚合证据优先指向 WebSocket，不能把 180 次合并分类全部定为 CPU，也不能从 101 数量推导失败率。[Pages 日志](https://developers.cloudflare.com/pages/functions/debugging-and-logging/)、[Cloudflare Workers CPU 限制](https://developers.cloudflare.com/workers/platform/limits/#cpu-time)。
+- 确认大块下行直发前会调用共享排空函数。之前就算没有待发送的合包数据，也会创建异步发送任务和清理链。本次在等待已有排空、清理定时器及判断连接有效后，队列为空即返回。正在发送的数据、合包顺序、首包响应头、已有错误传递和 BYOB 缓冲所有权检查仍走原路径。固定开销降低不会消除免费套餐单次 CPU 限制；尚无线上样本把这项开销定为告警根因。
+- 旧 Worker 源码保留在忽略的 `tmp/cf-cpu-downlink-baseline.js`，对照脚本 `tmp/cf-cpu-downlink-bench-long.cjs`。Node v26.12.1，交替顺序执行 7 轮、每轮 100 万次 64 KiB 合成读取，使用同步模拟发送并断言字节数及正常关闭。进程 CPU 时间中位数 1,266 ms → 1,015 ms，约下降 20%。另按 Async Hooks 统计每 1,000 次读取初始化 Promise 21,036 → 14,022。10 万次的短测 CPU 中位数均为 125 ms，存在系统计时粒度与本机负载影响。以上只衡量大块直发调度路径，不代表真实代理速度、整体 CPU 降幅或错误率。
+- 必要检查通过：现有 CPU 与协议兼容回归、7 项 KV 回归、源码和 Pages 包语法检查、`git diff --check`。Wrangler 4.128.0 用生产兼容日期 2026-11-07 本地构建至 `build/cpu-20261112/pages/`，用与生产兼容日期匹配的 workerd 在阻断外网的情况下验证 300,000 字节 TCP 到 WebSocket 内容及首包响应头，以及 gRPC、XHTTP、普通 WS、early-data 和 SS 升级握手。
+- 按用户要求提交到 `Chengeeker/forkedgetunnel:main`。基线 `d43a208` 可用于回退源码，Pages 保留旧生产部署。GitHub 推送后以 Pages 的生产提交和成功状态确认自动部署；待收集相近使用强度下的线上样本后再比较 CPU 超限率。真实出口和平台内部错误率变化未验证。
+
+## Cloudflare 超额提示复查（2026-11-12）
+
+- 通过已登录 Wrangler 的 Cloudflare API 只读核对生产部署及账户 GraphQL 指标。Pages 项目 `forkedgetunnel` 的生产提交为 `d43a208`，2026-11-09 10:03（北京时间）部署成功，已包含 `b3a768f` 的 CPU 优化，两提交之间只有开发文档变化。上次记录中生产仍指向旧提交的状态已过时。
+- 按 Pages API 返回的生产脚本标识匹配 `pagesFunctionsInvocationsAdaptiveGroups`。北京时间 11-11 00:00 至 11-12 00:00 共 13,248 次调用，其中成功 3,114、客户端断开 3,969、平台内部错误 5,473、资源超限 692。资源超限与内部错误的最高小时均为 11-11 11:00 至 12:00，分别为 180 和 683 次。北京时间 11-11 23:18 至 11-12 23:18 共 2,565 次调用，成功 526、客户端断开 986、平台内部错误 1,053，未见资源超限记录。GraphQL 的 `exceededResources` 是合并分类，不应把 692 次全部记为 CPU 超限，也不能将 `internalError` 或客户端断开累加到 CPU 告警计数。
+- 按账户配额的 UTC 日期汇总，11-10 与 11-11 的 Pages Functions 加 Workers 观测调用量分别约 3,984 和 13,334，11-12 查询时约 3,709，远低于免费账户日上限 100,000。KV 同期每日读取最多 522 次、写入最多 4 次，未见 429。以上是分析指标，不是计费台账。Workers 请求与 KV 日限额在北京时间 08:00 重置，免费 HTTP 调用的 10 ms CPU 限制按单次调用执行。前次通知按过去 24 小时累计失败次数统计，与日请求额度分开。
+- 用户随后提供邮件 PDF，发信时间为北京时间 2026-11-12 22:19，主题为「[需要操作]限制已超出」，正文明确指账户在过去 24 小时至少 100 次达到免费套餐 CPU 时间限制，并说明持续超限期间每日发一次摘要。邮件未列项目或内部聚合截止时间。只记录与诊断有关的内容，不保存邮件地址、账号标识、邮件链接或原件。
+- 以发信时间为截止重查北京时间 11-11 22:19 至 11-12 22:19 的账户 Pages 与 Workers 调用指标。`forkedgetunnel` 共 2,130 次调用，其中成功 534、客户端断开 757、`internalError` 839，未返回 `exceededResources` 记录。其他可见项目也未返回资源超限记录。再往前一个 24 小时窗口（11-10 22:19 至 11-11 22:19），Pages 资源超限类别共 692 次，均来自 `forkedgetunnel`，对应时段的独立 Workers 未见资源超限。前一窗口峰值是线索，但 `exceededResources` 包含多种运行限制，且邮件与按发信时间回看图表的数字不匹配，不能确认具体告警统计窗口、将 692 次都归为 CPU，或把内部错误算进邮件计数。
+- Wrangler 的凭据可查分析数据，通知历史接口返回 403。若再次出现资源超限，采集同一时段的失败请求、协议类型与 CPU 指标再定位热点。尚未用真实客户端复现或确认平台内部失败的原因，本轮仅查询和记录。
+- 依据：[Pages 调用指标](https://developers.cloudflare.com/pages/functions/metrics/)、[Pages 请求计费](https://developers.cloudflare.com/pages/functions/pricing/)、[Workers 限制](https://developers.cloudflare.com/workers/platform/limits/)、[KV 指标](https://developers.cloudflare.com/kv/observability/metrics-analytics/)及[日配额](https://developers.cloudflare.com/kv/platform/pricing/)。
+
 ## 固定凭据与下行合包 CPU 开销优化（2026-11-09）
 
 - 用户在上一轮排查后明确要求优化并重新推送 GitHub。本轮基线为 main 的 0a123fd8ae0706c3a10596d87532a30346eceedd，工作区仅已有上一轮诊断文档修改，已一并保留；原 Worker 与诊断文档保存到 build/rollback/20261109-cpu/。修改范围只有 _worker.js、tests/worker-cpu.test.cjs 和本开发记录；不改面板、部署脚本、配置、原 KV、公开响应、套餐或博客效果。本项目没有 APK 构建目标。

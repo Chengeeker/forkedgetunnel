@@ -3083,6 +3083,7 @@ function 创建下行Grain发送器(消息双向连接, 首部数据 = null, isA
 			grain.清空();
 			return;
 		}
+		if (grain.为空) return;
 		const 发送任务 = (async () => {
 			for (; ;) {
 				if (!当前发送器有效()) {
