@@ -446,7 +446,9 @@ function 启动重建程序 {
         Write-Host '即将删除并重建同名 Pages 项目。期间服务中断，旧部署历史和部署挂钩不会保留。'
         Write-Host '自定义域名会先解除关联，重建后恢复；不调用 DNS 记录修改接口，证书可能需要等待重新签发。'
         Write-Host '恢复范围为下述 Git 构建、环境变量、KV 与域名关联；Access 等项目外策略需另行核对。'
-        if ((读取部署输入 '确认继续请输入项目名；其他输入取消') -cne $状态.name) { Write-Host '已取消，原项目未删除。'; return }
+        $确认名称 = 读取部署输入 "确认删除并重建 $($状态.name)（直接回车确认；输入其他内容取消）"
+        if ($确认名称 -ceq '') { $确认名称 = $状态.name }
+        if ($确认名称 -cne $状态.name) { Write-Host '已取消，原项目未删除。'; return }
         $状态.plan = $计划; $状态.domains = @($项目.domains | Where-Object { $_ -notlike '*.pages.dev' })
         $状态.oldId = $项目.id; $状态.newId = $null; $状态.deploymentId = $null; $状态.phase = 'prepared'
         保存部署状态 $状态路径 $状态

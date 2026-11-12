@@ -10,6 +10,7 @@
 正确：my-tunnel
 错误：https://my-tunnel.pages.dev/admin、my-tunnel.pages.dev、我的项目
 再次部署填写 Cloudflare Workers & Pages 中原项目的名称，不一定等于 GitHub 仓库名。
+再次部署的最后一步会显示目标项目名，核对后直接回车即确认删除并重建。输入其他内容取消。
 
 首次运行准备：
 - Cloudflare Account ID（账号 ID，不是邮箱或 Zone ID）。

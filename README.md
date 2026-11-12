@@ -30,7 +30,7 @@ The independent local-cfdata launcher uses GPL-3.0-or-later; see its LICENSE.
 
 | 你要做什么 | 下载与运行 |
 | --- | --- |
-| 初次部署或更新 Cloudflare Pages 项目 | [下载 Pages-Deploy-Windows.zip](https://github.com/Chengeeker/forkedgetunnel/releases/download/pages-deploy-v1.0.0/Pages-Deploy-Windows.zip)，完整解压，双击根目录的 **redeploy-pages.cmd** |
+| 初次部署或更新 Cloudflare Pages 项目 | [下载 Pages-Deploy-Windows.zip](https://github.com/Chengeeker/forkedgetunnel/releases/download/pages-deploy-v1.0.1/Pages-Deploy-Windows.zip)，完整解压，双击根目录的 **redeploy-pages.cmd** |
 | 在自己的 Windows 电脑上本地优选 IP | [下载 CFData 本地优选包](https://github.com/Chengeeker/forkedgetunnel/releases/download/local-cfdata-v1.0.0/CFData-Local-Windows-1.0.0.zip)，完整解压后运行 **install.cmd** |
 
 部署包已包含 CMD、配套 PowerShell 脚本和中文使用说明，不需要再下载整个源码仓库。不要在 ZIP 内直接运行，也不要只复制单个 CMD。部署步骤与权限见 [Windows 部署教程](./docs/pages-redeploy.md)。

@@ -254,7 +254,7 @@ $状态.plan=生成重建计划 (Project)
 Throws { 执行重建 $状态 $文件 } 'KV 绑定不一致'
 
 # Interactive choices are exercised with queued answers, without touching the user's saved profile.
-$script:回答=[Collections.Generic.Queue[string]]::new()
+$script:回答=[Collections.Generic.Queue[object]]::new()
 function Read-Host {
     param($Prompt, [switch]$AsSecureString)
     if (-not $script:回答.Count) { throw "Unexpected prompt: $Prompt" }
@@ -313,7 +313,14 @@ try {
     Assert ((读取部署状态 $文件).phase -eq 'complete') 'Interactive initial flow did not finish'
     Assert (@($script:请求 | Where-Object { $_ -like 'DELETE *' }).Count -eq $删除数) 'Interactive first deploy deleted project'
     $首次ID=$script:远端.deployment_configs.production.kv_namespaces.KV.namespace_id
-    foreach ($答案 in @('2','','demo')) { $script:回答.Enqueue($答案) }
+    foreach ($取消确认 in @('取消', $null)) {
+        $请求起点=$script:请求.Count
+        foreach ($答案 in @('2','',$取消确认)) { $script:回答.Enqueue($答案) }
+        启动重建程序
+        Assert (@($script:请求 | Select-Object -Skip $请求起点 | Where-Object { $_ -notlike 'GET *' }).Count -eq 0) 'Rejected confirmation changed Cloudflare resources'
+        Assert ((读取部署状态 $文件).phase -eq 'complete') 'Rejected confirmation changed saved deployment state'
+    }
+    foreach ($答案 in @('2','','')) { $script:回答.Enqueue($答案) }
     启动重建程序
     Assert ($script:远端.deployment_configs.production.kv_namespaces.KV.namespace_id -eq $首次ID) 'Interactive repeat replaced storage'
     Assert ($script:远端.deployment_configs.production.env_vars.ADMIN.value -ceq 'first-password') 'Interactive repeat lost cached password'
